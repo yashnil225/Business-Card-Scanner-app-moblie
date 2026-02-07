@@ -7,7 +7,9 @@ import { CameraType, CameraView, useCameraPermissions } from 'expo-camera'
 import * as ImagePicker from 'expo-image-picker'
 import { useRouter } from 'expo-router'
 import { useRef, useState } from 'react'
-import { Alert, Pressable, StyleSheet, View } from 'react-native'
+import { Alert, Dimensions, Pressable, StyleSheet, View } from 'react-native'
+
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window')
 
 // Toggle Component
 function ScanModeToggle({ mode, setMode }: { mode: 'card' | 'qr', setMode: (m: 'card' | 'qr') => void }) {
@@ -84,7 +86,7 @@ function CameraScreen() {
             const result = await ImagePicker.launchImageLibraryAsync({
                 mediaTypes: ['images'],
                 allowsEditing: true,
-                aspect: [16, 10],
+                aspect: mode === 'card' ? [16, 10] : [1, 1],
                 quality: 0.8,
             })
 
@@ -100,6 +102,11 @@ function CameraScreen() {
         }
     }
 
+    // Calculate frame dimensions
+    const frameWidth = SCREEN_WIDTH * 0.85
+    const frameHeight = mode === 'card' ? frameWidth * 0.63 : frameWidth // Business card ratio vs Square for QR
+    const frameTop = SCREEN_HEIGHT * 0.25
+
     return (
         <View style={styles.container}>
             <CameraView
@@ -108,47 +115,70 @@ function CameraScreen() {
                 facing={facing}
                 enableTorch={flash}
             >
-                <View style={styles.overlay}>
-                    {/* Top Bar for Flash only */}
-                    <View style={styles.topBar}>
-                        <Pressable style={styles.iconButton} onPress={() => setFlash(!flash)}>
-                            <Ionicons
-                                name={flash ? 'flash' : 'flash-off'}
-                                size={24}
-                                color="#fff"
-                            />
+                {/* Grey Overlay with Cutout */}
+                <View style={styles.overlayContainer}>
+                    {/* Top overlay */}
+                    <View style={[styles.overlay, { height: frameTop }]} />
+                    
+                    {/* Middle section with frame cutout */}
+                    <View style={styles.middleSection}>
+                        {/* Left overlay */}
+                        <View style={styles.sideOverlay} />
+                        
+                        {/* Frame */}
+                        <View 
+                            style={[
+                                styles.frame, 
+                                { 
+                                    width: frameWidth, 
+                                    height: frameHeight,
+                                }
+                            ]}
+                        >
+                            {/* Corner brackets */}
+                            <View style={[styles.corner, styles.cornerTopLeft]} />
+                            <View style={[styles.corner, styles.cornerTopRight]} />
+                            <View style={[styles.corner, styles.cornerBottomLeft]} />
+                            <View style={[styles.corner, styles.cornerBottomRight]} />
+                        </View>
+                        
+                        {/* Right overlay */}
+                        <View style={styles.sideOverlay} />
+                    </View>
+                    
+                    {/* Bottom overlay */}
+                    <View style={[styles.overlay, { flex: 1 }]} />
+                </View>
+
+                {/* Top Bar - Flash */}
+                <View style={styles.topBar}>
+                    <Pressable style={styles.iconButton} onPress={() => setFlash(!flash)}>
+                        <Ionicons
+                            name={flash ? 'flash' : 'flash-off'}
+                            size={24}
+                            color="#fff"
+                        />
+                    </Pressable>
+                </View>
+
+                {/* Bottom Controls */}
+                <View style={styles.bottomSection}>
+                    {/* Toggle */}
+                    <ScanModeToggle mode={mode} setMode={setMode} />
+
+                    {/* Controls */}
+                    <View style={styles.controlsBar}>
+                        <Pressable onPress={() => router.back()}>
+                            <Text style={styles.controlText}>Cancel</Text>
                         </Pressable>
-                    </View>
 
-                    {/* Card Frame */}
-                    <View style={styles.cardFrame}>
-                        <View style={styles.frameBox}>
-                            <View style={[styles.frameCorner, styles.cornerTopLeft]} />
-                            <View style={[styles.frameCorner, styles.cornerTopRight]} />
-                            <View style={[styles.frameCorner, styles.cornerBottomLeft]} />
-                            <View style={[styles.frameCorner, styles.cornerBottomRight]} />
-                        </View>
-                    </View>
+                        <Pressable style={styles.captureButtonOuter} onPress={handleCapture}>
+                            <View style={styles.captureButtonInner} />
+                        </Pressable>
 
-                    {/* Bottom Section */}
-                    <View style={styles.bottomSection}>
-                        {/* Toggle */}
-                        <ScanModeToggle mode={mode} setMode={setMode} />
-
-                        {/* Controls */}
-                        <View style={styles.controlsBar}>
-                            <Pressable onPress={() => router.back()}>
-                                <Text style={styles.controlText}>Cancel</Text>
-                            </Pressable>
-
-                            <Pressable style={styles.captureButtonOuter} onPress={handleCapture}>
-                                <View style={styles.captureButtonInner} />
-                            </Pressable>
-
-                            <Pressable onPress={handlePickImage}>
-                                <Text style={styles.controlText}>Photos</Text>
-                            </Pressable>
-                        </View>
+                        <Pressable onPress={handlePickImage}>
+                            <Text style={styles.controlText}>Photos</Text>
+                        </Pressable>
                     </View>
                 </View>
             </CameraView>
@@ -164,14 +194,73 @@ const styles = StyleSheet.create({
     camera: {
         flex: 1,
     },
-    overlay: {
+    // Grey overlay system
+    overlayContainer: {
         ...StyleSheet.absoluteFillObject,
-        justifyContent: 'space-between',
+        flexDirection: 'column',
     },
+    overlay: {
+        backgroundColor: 'rgba(128, 128, 128, 0.6)', // Semi-transparent grey
+        width: '100%',
+    },
+    middleSection: {
+        flexDirection: 'row',
+        height: 'auto',
+    },
+    sideOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(128, 128, 128, 0.6)', // Semi-transparent grey
+    },
+    // Frame
+    frame: {
+        backgroundColor: 'transparent',
+        borderRadius: 12,
+        position: 'relative',
+    },
+    corner: {
+        position: 'absolute',
+        width: 30,
+        height: 30,
+        borderColor: '#fff',
+        borderWidth: 3,
+    },
+    cornerTopLeft: {
+        top: -2,
+        left: -2,
+        borderBottomWidth: 0,
+        borderRightWidth: 0,
+        borderTopLeftRadius: 12,
+    },
+    cornerTopRight: {
+        top: -2,
+        right: -2,
+        borderBottomWidth: 0,
+        borderLeftWidth: 0,
+        borderTopRightRadius: 12,
+    },
+    cornerBottomLeft: {
+        bottom: -2,
+        left: -2,
+        borderTopWidth: 0,
+        borderRightWidth: 0,
+        borderBottomLeftRadius: 12,
+    },
+    cornerBottomRight: {
+        bottom: -2,
+        right: -2,
+        borderTopWidth: 0,
+        borderLeftWidth: 0,
+        borderBottomRightRadius: 12,
+    },
+    // Top bar
     topBar: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
         flexDirection: 'row',
         justifyContent: 'flex-end',
-        paddingTop: spacing.xl + 20, // Status bar safe area
+        paddingTop: spacing.xl + 40,
         paddingHorizontal: spacing.lg,
     },
     iconButton: {
@@ -182,96 +271,59 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
     },
-    cardFrame: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        paddingHorizontal: spacing.xl,
-    },
-    frameBox: {
-        width: '100%',
-        aspectRatio: 1.586,
-        // No full border, only corners
-        backgroundColor: 'transparent',
-    },
-    frameCorner: {
-        position: 'absolute',
-        width: 40,
-        height: 40,
-        borderColor: '#fff',
-        borderWidth: 4,
-    },
-    cornerTopLeft: {
-        top: 0,
-        left: 0,
-        borderBottomWidth: 0,
-        borderRightWidth: 0,
-        borderTopLeftRadius: 16,
-    },
-    cornerTopRight: {
-        top: 0,
-        right: 0,
-        borderBottomWidth: 0,
-        borderLeftWidth: 0,
-        borderTopRightRadius: 16,
-    },
-    cornerBottomLeft: {
-        bottom: 0,
-        left: 0,
-        borderTopWidth: 0,
-        borderRightWidth: 0,
-        borderBottomLeftRadius: 16,
-    },
-    cornerBottomRight: {
-        bottom: 0,
-        right: 0,
-        borderTopWidth: 0,
-        borderLeftWidth: 0,
-        borderBottomRightRadius: 16,
-    },
+    // Bottom section
     bottomSection: {
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
         paddingBottom: spacing.xl + 20,
-        backgroundColor: 'rgba(0,0,0,0.2)', // Slight scrim
+        backgroundColor: '#000', // Solid black bottom bar
     },
+    // Toggle
     toggleContainer: {
         flexDirection: 'row',
         alignSelf: 'center',
-        backgroundColor: 'rgba(0,0,0,0.5)',
-        borderRadius: 20,
+        backgroundColor: 'rgba(128, 128, 128, 0.7)', // Grey background
+        borderRadius: 24,
         padding: 4,
         marginBottom: spacing.xl,
     },
     toggleOption: {
-        paddingVertical: 6,
-        paddingHorizontal: 16,
-        borderRadius: 16,
+        paddingVertical: 10,
+        paddingHorizontal: 20,
+        borderRadius: 20,
     },
     toggleOptionActive: {
         backgroundColor: '#fff',
     },
     toggleText: {
-        color: '#ccc',
-        fontSize: 13,
-        fontWeight: '600',
+        color: '#fff',
+        fontSize: 15,
+        fontWeight: '500',
     },
     toggleTextActive: {
         color: '#000',
     },
+    // Controls
     controlsBar: {
         flexDirection: 'row',
-        justifyContent: 'space-around',
+        justifyContent: 'space-between',
         alignItems: 'center',
-        paddingHorizontal: spacing.lg,
+        paddingHorizontal: spacing.xl,
+        paddingTop: spacing.md,
     },
     controlText: {
         color: '#fff',
-        fontSize: 16,
-        fontWeight: '500',
+        fontSize: 17,
+        fontWeight: '400',
+        minWidth: 70,
+        textAlign: 'center',
     },
     captureButtonOuter: {
-        width: 80,
-        height: 80,
-        borderRadius: 40,
+        width: 72,
+        height: 72,
+        borderRadius: 36,
         borderWidth: 4,
         borderColor: '#fff',
         justifyContent: 'center',
@@ -279,11 +331,12 @@ const styles = StyleSheet.create({
         backgroundColor: 'transparent',
     },
     captureButtonInner: {
-        width: 64,
-        height: 64,
-        borderRadius: 32,
+        width: 56,
+        height: 56,
+        borderRadius: 28,
         backgroundColor: '#fff',
     },
+    // Permission
     permissionContainer: {
         flex: 1,
         justifyContent: 'center',

@@ -1,16 +1,17 @@
 import { ScreenErrorBoundary } from '@/src/components/error'
-import { Button, CircularProgress, Text } from '@/src/components/ui'
+import { CircularProgress, Text } from '@/src/components/ui'
 import { useColors } from '@/src/hooks/useColors'
-import { fontSize, fontWeight, spacing } from '@/src/lib/theme'
+import { borderRadius, fontSize, fontWeight, spacing, type Colors } from '@/src/lib/theme'
 import { processContactImage, useContactsStore } from '@/src/stores/contactsStore'
 import { Ionicons } from '@expo/vector-icons'
+import { Image } from 'expo-image'
 import { useLocalSearchParams, useRouter } from 'expo-router'
-import { useEffect, useState } from 'react'
-import { Alert, Dimensions, Image, StyleSheet, View } from 'react-native'
+import { useEffect, useMemo, useState } from 'react'
+import { Alert, Dimensions, Pressable, SafeAreaView, StyleSheet, View } from 'react-native'
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window')
 
-// Mock review data
+// Review data matching the images exactly
 const REVIEWS = [
     {
         id: '1',
@@ -38,19 +39,23 @@ const REVIEWS = [
     },
 ]
 
+// Status messages that cycle during processing
+const STATUS_MESSAGES = [
+    'Finding info about RB...',
+    'Generating your summary...',
+    'Analyzing business card...',
+    'Extracting contact details...',
+]
+
 // Review Card Component
 function ReviewCard({ review }: { review: typeof REVIEWS[0] }) {
     const colors = useColors()
+    const styles = useMemo(() => createReviewStyles(colors), [colors])
 
     return (
-        <View
-            style={[
-                styles.reviewCard,
-                { backgroundColor: colors.surface, width: SCREEN_WIDTH - spacing.xl * 2 },
-            ]}
-        >
+        <View style={[styles.reviewCard, { width: SCREEN_WIDTH - spacing.xl * 2 }]}>
             <View style={styles.reviewHeader}>
-                <Image source={{ uri: review.avatar }} style={styles.avatar} />
+                <Image source={{ uri: review.avatar }} style={styles.avatar} contentFit="cover" />
                 <View style={styles.reviewInfo}>
                     <Text style={[styles.reviewerName, { color: colors.text }]}>
                         {review.name}, {review.title}
@@ -60,7 +65,7 @@ function ReviewCard({ review }: { review: typeof REVIEWS[0] }) {
                             <Ionicons
                                 key={i}
                                 name="star"
-                                size={14}
+                                size={16}
                                 color={i < review.rating ? '#FFB800' : colors.border}
                             />
                         ))}
@@ -77,6 +82,7 @@ function ReviewCard({ review }: { review: typeof REVIEWS[0] }) {
 // Review Carousel Component
 function ReviewCarousel() {
     const colors = useColors()
+    const styles = useMemo(() => createReviewStyles(colors), [colors])
     const [currentIndex, setCurrentIndex] = useState(0)
 
     useEffect(() => {
@@ -88,14 +94,14 @@ function ReviewCarousel() {
 
     return (
         <View style={styles.carouselContainer}>
-            <View style={styles.reviewsLabelContainer}>
+            {/* User reviews badge */}
+            <View style={[styles.reviewsBadge, { backgroundColor: '#F0F5FF' }]}>
                 <Ionicons
-                    name="chatbox-ellipses-outline"
-                    size={14}
+                    name="chatbubble-ellipses-outline"
+                    size={16}
                     color={colors.accent}
-                    style={{ marginRight: 4 }}
                 />
-                <Text style={[styles.reviewsLabel, { color: colors.accent }]}>
+                <Text style={[styles.reviewsBadgeText, { color: colors.accent }]}>
                     User reviews
                 </Text>
             </View>
@@ -111,7 +117,7 @@ function ReviewCarousel() {
                             styles.dot,
                             {
                                 backgroundColor:
-                                    i === currentIndex ? colors.accent : colors.border,
+                                    i === currentIndex ? colors.accent : '#E0E0E0',
                             },
                         ]}
                     />
@@ -124,11 +130,22 @@ function ReviewCarousel() {
 // Main Processing Screen
 function ProcessingScreen() {
     const colors = useColors()
+    const styles = useMemo(() => createStyles(colors), [colors])
     const router = useRouter()
     const { imageUri } = useLocalSearchParams<{ imageUri: string }>()
     const [status, setStatus] = useState<'loading' | 'success'>('loading')
-    const [statusText, setStatusText] = useState('Scanning business card...')
+    const [statusIndex, setStatusIndex] = useState(0)
     const [contactData, setContactData] = useState<any>(null)
+
+    // Cycle through status messages
+    useEffect(() => {
+        if (status === 'loading') {
+            const interval = setInterval(() => {
+                setStatusIndex((prev) => (prev + 1) % STATUS_MESSAGES.length)
+            }, 2000)
+            return () => clearInterval(interval)
+        }
+    }, [status])
 
     useEffect(() => {
         if (!imageUri) {
@@ -141,13 +158,12 @@ function ProcessingScreen() {
         const processImage = async () => {
             try {
                 setStatus('loading')
-                const data = await processContactImage(imageUri, (text) => {
-                    if (isMounted) setStatusText(text)
+                const data = await processContactImage(imageUri, undefined, (text: string) => {
+                    // Ignore callback, we use our own cycling messages
                 })
 
                 if (isMounted) {
                     setContactData(data)
-                    setStatusText('Complete!')
                     setStatus('success')
                 }
             } catch (error) {
@@ -159,7 +175,10 @@ function ProcessingScreen() {
             }
         }
 
-        processImage()
+        // Simulate processing time for demo
+        setTimeout(() => {
+            processImage()
+        }, 6000)
 
         return () => {
             isMounted = false
@@ -185,12 +204,12 @@ function ProcessingScreen() {
     }
 
     return (
-        <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
             <View style={styles.content}>
-                <View style={styles.topSection}>
-                    {/* Circular Progress Loader */}
+                {/* Top Section - Progress */}
+                <View style={styles.progressSection}>
                     <CircularProgress
-                        size={220}
+                        size={240}
                         strokeWidth={8}
                         status={status}
                         color={colors.accent}
@@ -198,7 +217,7 @@ function ProcessingScreen() {
 
                     {/* Status Text */}
                     <Text style={[styles.statusText, { color: colors.text }]}>
-                        {statusText}
+                        {status === 'success' ? 'Complete!' : STATUS_MESSAGES[statusIndex]}
                     </Text>
                 </View>
 
@@ -207,24 +226,28 @@ function ProcessingScreen() {
 
                 {/* View Research Button */}
                 <View style={styles.buttonContainer}>
-                    <Button
-                        onPress={handleContinue}
-                        variant="primary"
-                        style={[
+                    <Pressable
+                        style={({ pressed }) => [
                             styles.viewResearchButton,
-                            { opacity: status === 'success' ? 1 : 0.8 }
+                            {
+                                backgroundColor: status === 'success' ? colors.accent : '#A8C0FF',
+                                opacity: pressed ? 0.9 : 1
+                            }
                         ]}
+                        onPress={handleContinue}
                         disabled={status !== 'success'}
                     >
-                        View research
-                    </Button>
+                        <Text style={styles.viewResearchButtonText}>
+                            {status === 'success' ? 'View research' : 'View research'}
+                        </Text>
+                    </Pressable>
                 </View>
             </View>
-        </View>
+        </SafeAreaView>
     )
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: Colors) => StyleSheet.create({
     container: {
         flex: 1,
     },
@@ -232,9 +255,9 @@ const styles = StyleSheet.create({
         flex: 1,
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingVertical: spacing.xl * 2,
+        paddingVertical: spacing.xl,
     },
-    topSection: {
+    progressSection: {
         alignItems: 'center',
         marginTop: spacing.xl,
         gap: spacing.xl,
@@ -244,28 +267,47 @@ const styles = StyleSheet.create({
         fontWeight: fontWeight.medium,
         textAlign: 'center',
     },
+    buttonContainer: {
+        width: '100%',
+        paddingHorizontal: spacing.lg,
+        paddingBottom: spacing.lg,
+    },
+    viewResearchButton: {
+        height: 56,
+        borderRadius: borderRadius.full,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    viewResearchButtonText: {
+        color: '#fff',
+        fontSize: fontSize.lg,
+        fontWeight: '600',
+    },
+})
+
+const createReviewStyles = (colors: Colors) => StyleSheet.create({
     carouselContainer: {
         width: '100%',
         alignItems: 'center',
-        marginTop: spacing.xl,
+        marginVertical: spacing.xl,
     },
-    reviewsLabelContainer: {
+    reviewsBadge: {
         flexDirection: 'row',
         alignItems: 'center',
         marginBottom: spacing.md,
-        paddingHorizontal: spacing.sm,
+        paddingHorizontal: spacing.md,
         paddingVertical: spacing.xs,
         borderRadius: 16,
-        backgroundColor: 'rgba(65, 105, 225, 0.1)',
+        gap: 6,
     },
-    reviewsLabel: {
+    reviewsBadgeText: {
         fontSize: fontSize.sm,
         fontWeight: fontWeight.medium,
     },
     reviewCard: {
         padding: spacing.lg,
-        borderRadius: 16,
-        marginHorizontal: spacing.xl,
+        borderRadius: borderRadius.lg,
+        backgroundColor: colors.surface,
     },
     reviewHeader: {
         flexDirection: 'row',
@@ -305,14 +347,6 @@ const styles = StyleSheet.create({
         width: 8,
         height: 8,
         borderRadius: 4,
-    },
-    buttonContainer: {
-        width: '100%',
-        paddingHorizontal: spacing.xl,
-        marginBottom: spacing.lg,
-    },
-    viewResearchButton: {
-        width: '100%',
     },
 })
 

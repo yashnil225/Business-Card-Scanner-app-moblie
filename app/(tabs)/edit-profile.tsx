@@ -1,12 +1,16 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Alert, ScrollView, StyleSheet, View } from 'react-native'
+import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native'
+import * as ImagePicker from 'expo-image-picker'
+import { Image } from 'expo-image'
+import { Ionicons } from '@expo/vector-icons'
+import { useRouter } from 'expo-router'
 
 import { Button, Input, Text } from '@/src/components/ui'
 import { ScreenErrorBoundary } from '@/src/components/error'
-import { useAuthStore } from '@/src/features/auth'
-import { useUserProfile, useUpdateUserProfile } from '@/src/features/profile'
+import { useUserStore } from '@/src/stores'
 import { useColors } from '@/src/hooks/useColors'
-import { borderRadius, spacing, type Colors } from '@/src/lib/theme'
+import { borderRadius, spacing, fontSize, type Colors } from '@/src/lib/theme'
+import { getInitials, getCompanyColor } from '@/src/lib/companyUtils'
 
 const createStyles = (colors: Colors) =>
   StyleSheet.create({
@@ -18,6 +22,50 @@ const createStyles = (colors: Colors) =>
       padding: spacing.lg,
       paddingBottom: spacing.xl,
       gap: spacing.xl,
+    },
+    photoSection: {
+      alignItems: 'center',
+      paddingVertical: spacing.xl,
+    },
+    photoContainer: {
+      width: 120,
+      height: 120,
+      borderRadius: 60,
+      backgroundColor: colors.surface,
+      justifyContent: 'center',
+      alignItems: 'center',
+      borderWidth: 3,
+      borderColor: colors.border,
+      overflow: 'hidden',
+    },
+    photoImage: {
+      width: 120,
+      height: 120,
+    },
+    photoPlaceholder: {
+      width: 120,
+      height: 120,
+      borderRadius: 60,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    photoPlaceholderText: {
+      fontSize: fontSize['3xl'],
+      fontWeight: '700',
+      color: '#fff',
+    },
+    photoEditButton: {
+      position: 'absolute',
+      bottom: 0,
+      right: 0,
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      backgroundColor: colors.accent,
+      justifyContent: 'center',
+      alignItems: 'center',
+      borderWidth: 2,
+      borderColor: colors.background,
     },
     section: {
       padding: spacing.lg,
@@ -41,11 +89,6 @@ const createStyles = (colors: Colors) =>
       justifyContent: 'space-between',
       gap: spacing.md,
     },
-    sectionFooter: {
-      marginTop: spacing.sm,
-      flexDirection: 'row',
-      justifyContent: 'flex-start',
-    },
     dangerSection: {
       borderColor: colors.danger,
     },
@@ -55,86 +98,72 @@ const createStyles = (colors: Colors) =>
   })
 
 function EditProfileScreen() {
-  const { user, updatePassword, resetPassword, deleteAccount, isLoading } = useAuthStore()
-  const { data: profile } = useUserProfile(user?.id)
-  const updateProfile = useUpdateUserProfile()
+  const router = useRouter()
   const colors = useColors()
   const styles = useMemo(() => createStyles(colors), [colors])
+  
+  // Local user data
+  const user = useUserStore((state) => state.user)
+  const updateUser = useUserStore((state) => state.updateUser)
+  const deleteUser = useUserStore((state) => state.deleteUser)
+  const [isLoading, setIsLoading] = useState(false)
 
-  const [displayName, setDisplayName] = useState('')
-  const [newPassword, setNewPassword] = useState('')
-  const [confirmPassword, setConfirmPassword] = useState('')
+  const [name, setName] = useState('')
+  const [email, setEmail] = useState('')
+  const [photoUri, setPhotoUri] = useState<string | null>(null)
 
   useEffect(() => {
-    if (profile?.display_name !== undefined && profile?.display_name !== null) {
-      setDisplayName(profile.display_name)
+    if (user) {
+      setName(user.name)
+      setEmail(user.email || '')
+      setPhotoUri(user.photoUri)
     }
-  }, [profile?.display_name])
+  }, [user])
+
+  const handlePickImage = async () => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      })
+
+      if (!result.canceled && result.assets[0]) {
+        setPhotoUri(result.assets[0].uri)
+      }
+    } catch (error) {
+      console.error('Image picker error:', error)
+      Alert.alert('Error', 'Failed to pick image. Please try again.')
+    }
+  }
 
   const handleSaveProfile = useCallback(async () => {
-    if (!user?.id) {
-      Alert.alert('Profile Update Failed', 'No authenticated user found.')
+    const trimmedName = name.trim()
+    
+    if (!trimmedName) {
+      Alert.alert('Name Required', 'Please enter your name.')
       return
     }
 
-    const trimmedName = displayName.trim()
+    setIsLoading(true)
 
     try {
-      await updateProfile.mutateAsync({
-        userId: user.id,
-        updates: {
-          display_name: trimmedName.length > 0 ? trimmedName : null,
-        },
+      updateUser({
+        name: trimmedName,
+        email: email.trim() || null,
+        photoUri,
       })
-      Alert.alert('Profile Updated', 'Your display name has been updated.')
+      Alert.alert('Profile Updated', 'Your profile has been updated successfully.')
     } catch (error) {
       Alert.alert(
         'Profile Update Failed',
         error instanceof Error ? error.message : 'An unexpected error occurred'
       )
+    } finally {
+      setIsLoading(false)
     }
-  }, [displayName, updateProfile, user?.id])
-
-  const handleUpdatePassword = useCallback(async () => {
-    if (!newPassword) {
-      Alert.alert('Password Required', 'Enter a new password to continue.')
-      return
-    }
-
-    if (newPassword !== confirmPassword) {
-      Alert.alert('Passwords Do Not Match', 'Make sure both password fields match.')
-      return
-    }
-
-    try {
-      await updatePassword(newPassword)
-      setNewPassword('')
-      setConfirmPassword('')
-      Alert.alert('Password Updated', 'Your password has been updated.')
-    } catch (error) {
-      Alert.alert(
-        'Password Update Failed',
-        error instanceof Error ? error.message : 'An unexpected error occurred'
-      )
-    }
-  }, [confirmPassword, newPassword, updatePassword])
-
-  const handleResetPassword = useCallback(async () => {
-    if (!user?.email) {
-      Alert.alert('Reset Failed', 'No email address found for this account.')
-      return
-    }
-
-    try {
-      await resetPassword(user.email)
-      Alert.alert('Reset Email Sent', 'Check your inbox for a password reset link.')
-    } catch (error) {
-      Alert.alert(
-        'Reset Failed',
-        error instanceof Error ? error.message : 'An unexpected error occurred'
-      )
-    }
-  }, [resetPassword, user?.email])
+  }, [name, email, photoUri, updateUser])
 
   const handleDeleteAccount = useCallback(() => {
     Alert.alert(
@@ -145,20 +174,24 @@ function EditProfileScreen() {
         {
           text: 'Delete',
           style: 'destructive',
-          onPress: async () => {
-            try {
-              await deleteAccount()
-            } catch (error) {
-              Alert.alert(
-                'Delete Account Failed',
-                error instanceof Error ? error.message : 'An unexpected error occurred'
-              )
-            }
+          onPress: () => {
+            deleteUser()
+            router.replace('/(auth)/get-started')
           },
         },
       ]
     )
-  }, [deleteAccount])
+  }, [deleteUser, router])
+
+  const initials = useMemo(() => getInitials(name), [name])
+
+  if (!user) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <Text>User not found</Text>
+      </View>
+    )
+  }
 
   return (
     <ScrollView
@@ -166,6 +199,29 @@ function EditProfileScreen() {
       contentContainerStyle={styles.content}
       accessibilityRole="scrollbar"
     >
+      {/* Photo Section */}
+      <View style={styles.photoSection}>
+        <Pressable onPress={handlePickImage}>
+          {photoUri ? (
+            <View style={styles.photoContainer}>
+              <Image
+                source={{ uri: photoUri }}
+                style={styles.photoImage}
+                contentFit="cover"
+              />
+            </View>
+          ) : (
+            <View style={[styles.photoPlaceholder, { backgroundColor: getCompanyColor(name) }]}>
+              <Text style={styles.photoPlaceholderText}>{initials}</Text>
+            </View>
+          )}
+          <View style={styles.photoEditButton}>
+            <Ionicons name="camera" size={18} color="#fff" />
+          </View>
+        </Pressable>
+      </View>
+
+      {/* Profile Section */}
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
           <Text variant="h3" style={styles.sectionTitle}>
@@ -173,67 +229,34 @@ function EditProfileScreen() {
           </Text>
           <Button
             onPress={handleSaveProfile}
-            loading={updateProfile.isPending}
+            loading={isLoading}
             size="sm"
             variant="outline"
-            accessibilityLabel="Save display name"
+            accessibilityLabel="Save profile"
           >
-            {updateProfile.isPending ? 'Saving...' : 'Save'}
+            {isLoading ? 'Saving...' : 'Save'}
           </Button>
         </View>
         <Input
-          placeholder="Display name"
-          accessibilityLabel="Display name"
-          value={displayName}
-          onChangeText={setDisplayName}
+          placeholder="Full Name"
+          accessibilityLabel="Full name"
+          value={name}
+          onChangeText={setName}
           autoCapitalize="words"
+          returnKeyType="done"
+        />
+        <Input
+          placeholder="Email (optional)"
+          accessibilityLabel="Email"
+          value={email}
+          onChangeText={setEmail}
+          autoCapitalize="none"
+          keyboardType="email-address"
           returnKeyType="done"
         />
       </View>
 
-      <View style={styles.section}>
-        <View style={styles.sectionHeader}>
-          <Text variant="h3" style={styles.sectionTitle}>
-            Password
-          </Text>
-          <Button
-            onPress={handleUpdatePassword}
-            loading={isLoading}
-            size="sm"
-            variant="outline"
-            accessibilityLabel="Update password"
-          >
-            {isLoading ? 'Updating...' : 'Update'}
-          </Button>
-        </View>
-        <Input
-          placeholder="New password"
-          accessibilityLabel="New password"
-          value={newPassword}
-          onChangeText={setNewPassword}
-          secureTextEntry
-          textContentType="newPassword"
-        />
-        <Input
-          placeholder="Confirm password"
-          accessibilityLabel="Confirm password"
-          value={confirmPassword}
-          onChangeText={setConfirmPassword}
-          secureTextEntry
-          textContentType="newPassword"
-        />
-        <View style={styles.sectionFooter}>
-          <Button
-            onPress={handleResetPassword}
-            variant="ghost"
-            size="sm"
-            accessibilityLabel="Send password reset email"
-          >
-            Send reset email
-          </Button>
-        </View>
-      </View>
-
+      {/* Danger Zone */}
       <View style={[styles.section, styles.dangerSection]}>
         <Text variant="h3" style={[styles.sectionTitle, styles.dangerTitle]}>
           Danger Zone
@@ -241,11 +264,10 @@ function EditProfileScreen() {
         <Button
           onPress={handleDeleteAccount}
           variant="danger"
-          loading={isLoading}
           size="md"
           accessibilityLabel="Delete your account"
         >
-          {isLoading ? 'Deleting...' : 'Delete Account'}
+          Delete Account
         </Button>
       </View>
     </ScrollView>

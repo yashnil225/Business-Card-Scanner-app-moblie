@@ -1,16 +1,17 @@
 import { Ionicons } from '@expo/vector-icons'
 import Constants from 'expo-constants'
+import { Image } from 'expo-image'
 import { useCallback, useMemo, useState } from 'react'
 import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native'
 import { useRouter } from 'expo-router'
 
-import { Avatar, Button, Text } from '@/src/components/ui'
+import { Button, Text } from '@/src/components/ui'
 import { useColors } from '@/src/hooks/useColors'
-import { spacing, borderRadius, type Colors, type ThemeMode } from '@/src/lib/theme'
+import { spacing, borderRadius, fontSize, type Colors, type ThemeMode } from '@/src/lib/theme'
 import { useAuthStore } from '@/src/features/auth'
-import { useUserProfile } from '@/src/features/profile'
-import { useThemeStore } from '@/src/stores/themeStore'
+import { useThemeStore, useUserStore } from '@/src/stores'
 import { ScreenErrorBoundary } from '@/src/components/error'
+import { getInitials, getCompanyColor } from '@/src/lib/companyUtils'
 
 const themeModeLabels: Record<ThemeMode, string> = {
   light: 'Light',
@@ -33,6 +34,34 @@ const createStyles = (colors: Colors) =>
       alignItems: 'center',
       paddingVertical: spacing.xl,
       paddingHorizontal: spacing.lg,
+    },
+    avatarContainer: {
+      width: 100,
+      height: 100,
+      borderRadius: 50,
+      backgroundColor: colors.surface,
+      justifyContent: 'center',
+      alignItems: 'center',
+      overflow: 'hidden',
+      borderWidth: 3,
+      borderColor: colors.border,
+    },
+    avatarImage: {
+      width: 100,
+      height: 100,
+    },
+    avatarPlaceholder: {
+      width: 100,
+      height: 100,
+      borderRadius: 50,
+      backgroundColor: colors.accent,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    avatarText: {
+      fontSize: fontSize['3xl'],
+      fontWeight: '700',
+      color: '#fff',
     },
     userName: {
       marginTop: spacing.md,
@@ -91,24 +120,49 @@ const createStyles = (colors: Colors) =>
   })
 
 function ProfileScreen() {
-  const { user, signOut, isLoading } = useAuthStore()
   const router = useRouter()
   const { mode, setMode } = useThemeStore()
   const [showThemePicker, setShowThemePicker] = useState(false)
   const colors = useColors()
   const styles = useMemo(() => createStyles(colors), [colors])
-  const { data: profile } = useUserProfile(user?.id)
+  
+  // Local user data
+  const user = useUserStore((state) => state.user)
+  const deleteUser = useUserStore((state) => state.deleteUser)
+  
+  // Auth store for sign out (kept for showcase)
+  const { signOut, isLoading } = useAuthStore()
 
   const handleSignOut = useCallback(async () => {
     try {
       await signOut()
+      deleteUser() // Also clear local user
     } catch (error) {
       Alert.alert(
         'Sign Out Failed',
         error instanceof Error ? error.message : 'An unexpected error occurred'
       )
     }
-  }, [signOut])
+  }, [signOut, deleteUser])
+
+  const handleDeleteAccount = useCallback(() => {
+    Alert.alert(
+      'Delete Account',
+      'Are you sure you want to delete your account? This action cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => {
+            deleteUser()
+            // Redirect to get started
+            router.replace('/(auth)/get-started')
+          },
+        },
+      ]
+    )
+  }, [deleteUser, router])
 
   const handleThemeChange = useCallback(
     (themeMode: ThemeMode) => {
@@ -117,7 +171,10 @@ function ProfileScreen() {
     [setMode]
   )
 
-  const displayName = profile?.display_name ?? user?.email?.split('@')[0] ?? 'User'
+  const displayName = user?.name ?? 'User'
+  const userEmail = user?.email
+  const userPhoto = user?.photoUri
+  const initials = useMemo(() => getInitials(displayName), [displayName])
 
   return (
     <ScrollView
@@ -126,16 +183,27 @@ function ProfileScreen() {
       accessibilityRole="scrollbar"
     >
       <View style={styles.header}>
-        <Avatar
-          name={user?.email}
-          size="xl"
-        />
+        {userPhoto ? (
+          <View style={styles.avatarContainer}>
+            <Image
+              source={{ uri: userPhoto }}
+              style={styles.avatarImage}
+              contentFit="cover"
+            />
+          </View>
+        ) : (
+          <View style={[styles.avatarPlaceholder, { backgroundColor: getCompanyColor(displayName) }]}>
+            <Text style={styles.avatarText}>{initials}</Text>
+          </View>
+        )}
         <Text variant="h3" style={styles.userName}>
           {displayName}
         </Text>
-        <Text variant="bodySmall" color="secondary" style={styles.userEmail}>
-          {user?.email}
-        </Text>
+        {userEmail && (
+          <Text variant="bodySmall" color="secondary" style={styles.userEmail}>
+            {userEmail}
+          </Text>
+        )}
       </View>
 
       <View style={styles.section}>
@@ -226,6 +294,18 @@ function ProfileScreen() {
           accessibilityHint="Double tap to sign out"
         >
           {isLoading ? 'Logging out...' : 'Log Out'}
+        </Button>
+      </View>
+
+      <View style={styles.logoutSection}>
+        <Button
+          onPress={handleDeleteAccount}
+          variant="danger"
+          fullWidth
+          accessibilityLabel="Delete your account"
+          accessibilityHint="Double tap to delete your account"
+        >
+          Delete Account
         </Button>
       </View>
 

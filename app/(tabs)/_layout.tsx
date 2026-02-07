@@ -9,7 +9,7 @@ export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: colors.text,
+        tabBarActiveTintColor: colors.accent,
         tabBarInactiveTintColor: colors.tertiary,
         tabBarStyle: {
           backgroundColor: colors.background,
@@ -22,21 +22,27 @@ export default function TabLayout() {
         headerShadowVisible: false,
         tabBarAccessibilityLabel: 'Main navigation',
       }}
+      // Contacts is the default tab that opens first
+      initialRouteName="contacts"
     >
+      {/* Dashboard tab - first in order but not default */}
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Home',
+          title: 'Dashboard',
+          headerShown: false,
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="home-outline" size={size} color={color} />
+            <Ionicons name="grid-outline" size={size} color={color} />
           ),
-          tabBarAccessibilityLabel: 'Home tab',
+          tabBarAccessibilityLabel: 'Dashboard tab',
         }}
       />
+      {/* Contacts tab - default tab that opens first */}
       <Tabs.Screen
         name="contacts"
         options={{
           title: 'Contacts',
+          headerShown: false,
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="people-outline" size={size} color={color} />
           ),
@@ -47,12 +53,14 @@ export default function TabLayout() {
         name="profile"
         options={{
           title: 'Profile',
+          headerShown: false,
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="person-outline" size={size} color={color} />
           ),
           tabBarAccessibilityLabel: 'Profile tab',
         }}
       />
+      {/* Hidden screens */}
       <Tabs.Screen
         name="contact-detail"
         options={{

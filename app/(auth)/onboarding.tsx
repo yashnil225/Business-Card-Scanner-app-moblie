@@ -1,101 +1,132 @@
 import { ScreenErrorBoundary } from '@/src/components/error'
-import { Button, Text } from '@/src/components/ui'
-import { useAuthStore } from '@/src/features/auth'
+import { Text } from '@/src/components/ui'
 import { useColors } from '@/src/hooks/useColors'
-import { spacing, type Colors } from '@/src/lib/theme'
+import { borderRadius, fontSize, spacing, type Colors } from '@/src/lib/theme'
+import { useUserStore } from '@/src/stores'
 import { Ionicons } from '@expo/vector-icons'
 import { Image } from 'expo-image'
 import { useRouter } from 'expo-router'
-import { useMemo, useState } from 'react'
-import { Dimensions, Modal, Pressable, SafeAreaView, StyleSheet, View } from 'react-native'
+import { useMemo } from 'react'
+import { Dimensions, Pressable, SafeAreaView, StyleSheet, View } from 'react-native'
 
 const { width } = Dimensions.get('window')
+
+// Company logos
+const COMPANY_LOGOS = [
+    { name: 'PwC' },
+    { name: 'DELTA' },
+    { name: 'Grant Thornton' },
+    { name: 'EY' },
+    { name: 'Cartier' },
+    { name: 'SAAB' },
+    { name: 'Culligan' },
+    { name: 'AVIS' },
+]
 
 function OnboardingScreen() {
     const colors = useColors()
     const styles = useMemo(() => createStyles(colors), [colors])
     const router = useRouter()
-    const [showLogin, setShowLogin] = useState(false)
-    const signInAnonymously = useAuthStore((state) => state.signInAnonymously)
 
-    const handleGetStarted = () => {
-        router.push('/(auth)/get-started')
+    const handleBack = () => {
+        router.back()
+    }
+
+    const completeOnboarding = useUserStore((state) => state.completeOnboarding)
+
+    const handleOpenCamera = () => {
+        completeOnboarding()
+        router.push('/(scan)/camera')
     }
 
     return (
         <SafeAreaView style={styles.container}>
+            {/* Header with Back and Progress */}
+            <View style={styles.header}>
+                <Pressable
+                    onPress={handleBack}
+                    hitSlop={8}
+                    style={styles.backButton}
+                >
+                    <Ionicons name="chevron-back" size={28} color={colors.text} />
+                </Pressable>
+
+                {/* Progress Pills */}
+                <View style={styles.progressContainer}>
+                    <View style={[styles.progressPill, styles.progressPillActive, { backgroundColor: colors.accent }]} />
+                    <View style={[styles.progressPill, { backgroundColor: colors.border }]} />
+                    <View style={[styles.progressPill, { backgroundColor: colors.border }]} />
+                </View>
+
+                <View style={styles.backButton} />
+            </View>
+
+            {/* Hero Section with light background */}
+            <View style={styles.heroSection}>
+                <Image
+                    source={require('@/assets/images/onboarding-shared.png')}
+                    style={styles.heroImage}
+                    contentFit="contain"
+                />
+            </View>
+
+            {/* Content Section */}
             <View style={styles.content}>
-                {/* Hero Image */}
-                <View style={styles.heroContainer}>
-                    <Image
-                        source={require('@/assets/images/onboarding-shared.png')}
-                        style={styles.heroImage}
-                        contentFit="contain"
-                    />
-                </View>
+                {/* Title */}
+                <Text style={[styles.title, { color: colors.text }]}>
+                    Scan a card, experience{'\n'}true accuracy
+                </Text>
 
-                {/* Text Polish */}
-                <View style={styles.textContainer}>
-                    <Text style={[styles.title, { color: colors.text }]}>
-                        Scan a card, experience{'\n'}true accuracy
-                    </Text>
-                    <Text style={[styles.subtitle, { color: colors.secondary }]}>
-                        Trusted by 2 million professionals
-                    </Text>
-                </View>
+                {/* Subtitle */}
+                <Text style={[styles.subtitle, { color: colors.secondary }]}>
+                    Trusted by 2 million professionals
+                </Text>
 
-                {/* Bottom Actions */}
-                <View style={styles.actions}>
-                    <Pressable
-                        style={({ pressed }) => [
-                            styles.getStartedButton,
-                            { backgroundColor: colors.accent, opacity: pressed ? 0.9 : 1 }
-                        ]}
-                        onPress={handleGetStarted}
-                    >
-                        <Text style={styles.getStartedText}>Next</Text>
-                    </Pressable>
-
-                    <Pressable
-                        style={styles.loginButton}
-                        onPress={() => setShowLogin(true)}
-                    >
-                        <Text style={[styles.loginText, { color: colors.text }]}>Log in</Text>
-                    </Pressable>
+                {/* Company Logos */}
+                <View style={styles.logosContainer}>
+                    <View style={styles.logosRow}>
+                        {COMPANY_LOGOS.slice(0, 4).map((company, idx) => (
+                            <View key={idx} style={styles.logoItem}>
+                                <Text style={[styles.logoText, { color: colors.secondary }]}>
+                                    {company.name === 'PwC' ? 'pwc' : 
+                                     company.name === 'DELTA' ? 'DELTA' :
+                                     company.name === 'Grant Thornton' ? 'Grant Thornton' :
+                                     company.name === 'EY' ? 'EY' : company.name}
+                                </Text>
+                            </View>
+                        ))}
+                    </View>
+                    <View style={styles.logosRow}>
+                        {COMPANY_LOGOS.slice(4).map((company, idx) => (
+                            <View key={idx} style={styles.logoItem}>
+                                <Text style={[styles.logoText, { color: colors.secondary }]}>
+                                    {company.name === 'Cartier' ? 'Cartier' :
+                                     company.name === 'SAAB' ? 'SAAB' :
+                                     company.name === 'Culligan' ? 'Culligan' :
+                                     company.name === 'AVIS' ? 'AVIS' : company.name}
+                                </Text>
+                            </View>
+                        ))}
+                    </View>
                 </View>
             </View>
 
-            {/* Login Modal (Placeholder for the "Sheet" mentioned) */}
-            <Modal
-                visible={showLogin}
-                animationType="slide"
-                presentationStyle="pageSheet"
-                onRequestClose={() => setShowLogin(false)}
-            >
-                <View style={[styles.modalContainer, { backgroundColor: colors.background }]}>
-                    <View style={styles.modalHeader}>
-                        <Text variant="h3">Log in</Text>
-                        <Pressable onPress={() => setShowLogin(false)}>
-                            <Ionicons name="close" size={24} color={colors.text} />
-                        </Pressable>
-                    </View>
-                    <View style={styles.modalContent}>
-                        <Text style={{ textAlign: 'center', marginTop: 20 }}>
-                            Login flow implementation goes here matching the design.
-                        </Text>
-                        {/* Initial implementation placeholder */}
-                        <Button
-                            style={{ marginTop: 20 }}
-                            onPress={() => {
-                                signInAnonymously()
-                                router.replace('/(tabs)')
-                            }}
-                        >
-                            Simulate Login
-                        </Button>
-                    </View>
-                </View>
-            </Modal>
+            {/* Bottom Action */}
+            <View style={styles.bottomSection}>
+                <Pressable
+                    style={({ pressed }) => [
+                        styles.ctaButton,
+                        {
+                            backgroundColor: colors.accent,
+                            opacity: pressed ? 0.9 : 1
+                        }
+                    ]}
+                    onPress={handleOpenCamera}
+                >
+                    <Ionicons name="scan" size={20} color="#fff" />
+                    <Text style={styles.ctaButtonText}>Open camera</Text>
+                </Pressable>
+            </View>
         </SafeAreaView>
     )
 }
@@ -103,94 +134,114 @@ function OnboardingScreen() {
 const createStyles = (colors: Colors) => StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: colors.background,
+        backgroundColor: '#EEF2FF', // Light blue background
     },
-    content: {
-        flex: 1,
-        paddingHorizontal: spacing.xl,
+    // Header
+    header: {
+        flexDirection: 'row',
+        alignItems: 'center',
         justifyContent: 'space-between',
+        paddingHorizontal: spacing.lg,
+        paddingVertical: spacing.md,
+    },
+    backButton: {
+        width: 40,
+        height: 40,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    progressContainer: {
+        flexDirection: 'row',
+        gap: spacing.sm,
+        justifyContent: 'center',
+    },
+    progressPill: {
+        height: 6,
+        borderRadius: 3,
+        width: 40,
+    },
+    progressPillActive: {
+        width: 60,
+    },
+    // Hero Section
+    heroSection: {
+        flex: 0.4,
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingHorizontal: spacing.lg,
         paddingVertical: spacing.xl,
     },
-    heroContainer: {
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginTop: spacing.xl,
-        flex: 1,
-        // Add specific styling to match the "hand image" placement if needed
-    },
     heroImage: {
-        width: width * 0.8,
-        height: width * 0.8,
+        width: width * 0.7,
+        height: 180,
     },
-    textContainer: {
+    // Content
+    content: {
+        flex: 0.4,
+        backgroundColor: colors.background,
+        borderTopLeftRadius: 32,
+        borderTopRightRadius: 32,
+        paddingHorizontal: spacing.lg,
+        paddingTop: spacing.xl,
         alignItems: 'center',
-        marginBottom: spacing.xl,
     },
     title: {
-        fontSize: 28,
+        fontSize: fontSize['2xl'],
         fontWeight: '700',
         textAlign: 'center',
-        marginBottom: spacing.sm,
         lineHeight: 36,
+        marginBottom: spacing.md,
     },
     subtitle: {
-        fontSize: 16,
+        fontSize: fontSize.base,
         textAlign: 'center',
+        lineHeight: 24,
         marginBottom: spacing.lg,
     },
-    socialProof: {
+    // Logos
+    logosContainer: {
+        width: '100%',
+        gap: spacing.md,
+    },
+    logosRow: {
         flexDirection: 'row',
-        gap: spacing.lg,
+        justifyContent: 'space-around',
+        alignItems: 'center',
+    },
+    logoItem: {
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    logoText: {
+        fontSize: fontSize.sm,
+        fontWeight: '600',
         opacity: 0.7,
     },
-    proofText: {
-        fontWeight: '600',
-        fontSize: 14,
+    // Bottom Section
+    bottomSection: {
+        backgroundColor: colors.background,
+        paddingHorizontal: spacing.lg,
+        paddingVertical: spacing.lg,
+        paddingBottom: spacing.xl,
     },
-    actions: {
-        gap: spacing.md,
-        marginBottom: spacing.xl,
-    },
-    getStartedButton: {
+    ctaButton: {
         height: 56,
-        borderRadius: 28,
-        justifyContent: 'center',
+        borderRadius: borderRadius.full,
+        flexDirection: 'row',
         alignItems: 'center',
-        width: '100%',
-        shadowColor: "#000",
+        justifyContent: 'center',
+        gap: spacing.md,
+        shadowColor: colors.accent,
         shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.2,
+        shadowOpacity: 0.3,
         shadowRadius: 8,
-        elevation: 4,
+        elevation: 5,
     },
-    getStartedText: {
+    ctaButtonText: {
         color: '#fff',
-        fontSize: 18,
+        fontSize: fontSize.lg,
         fontWeight: '600',
     },
-    loginButton: {
-        height: 48,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    loginText: {
-        fontSize: 16,
-        fontWeight: '500',
-    },
-    // Modal
-    modalContainer: {
-        flex: 1,
-        padding: spacing.lg,
-    },
-    modalHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: spacing.xl,
-    },
-    modalContent: {
-        flex: 1
-    }
 })
 
 export default function Onboarding() {

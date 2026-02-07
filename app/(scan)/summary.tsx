@@ -1,32 +1,18 @@
 import { ScreenErrorBoundary } from '@/src/components/error'
-import { Button, Text } from '@/src/components/ui'
+import { Text } from '@/src/components/ui'
 import { useColors } from '@/src/hooks/useColors'
-import { spacing } from '@/src/lib/theme'
+import { borderRadius, fontSize, fontWeight, spacing, type Colors } from '@/src/lib/theme'
 import { useContactsStore } from '@/src/stores/contactsStore'
 import { Ionicons } from '@expo/vector-icons'
 import { Image } from 'expo-image'
 import { useLocalSearchParams, useRouter } from 'expo-router'
+import * as Linking from 'expo-linking'
 import { useMemo } from 'react'
-import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native'
-
-// Reusable Action Button (Same as ContactDetail)
-function ActionButton({ icon, label, onPress }: { icon: string; label: string; onPress: () => void }) {
-    const colors = useColors()
-    return (
-        <View style={styles.actionButtonContainer}>
-            <Pressable
-                style={[styles.actionButton, { backgroundColor: '#F0F5FF' }]}
-                onPress={onPress}
-            >
-                <Ionicons name={icon as any} size={24} color={colors.accent} />
-            </Pressable>
-            <Text style={[styles.actionLabel, { color: colors.accent }]}>{label}</Text>
-        </View>
-    )
-}
+import { Alert, Pressable, SafeAreaView, ScrollView, StyleSheet, View } from 'react-native'
 
 function SummaryScreen() {
     const colors = useColors()
+    const styles = useMemo(() => createStyles(colors), [colors])
     const router = useRouter()
     const { contactData } = useLocalSearchParams<{ contactData: string }>()
     const addContact = useContactsStore((state) => state.addContact)
@@ -44,15 +30,12 @@ function SummaryScreen() {
     const handleSave = () => {
         if (!contact) return
 
-        // Add to store
         addContact({
             ...contact,
             createdAt: Date.now(),
             updatedAt: Date.now(),
         })
 
-        // Navigate to dashboard (or contact list)
-        // Using replace to clear stack history of scanning
         router.replace('/(tabs)')
     }
 
@@ -67,243 +50,333 @@ function SummaryScreen() {
         ])
     }
 
+    // Helper function to render text with LinkedIn links
+    const renderTextWithLinks = (text: string) => {
+        if (!text) return null
+
+        // Regex to match LinkedIn URLs or "LinkedIn" text
+        const linkedInRegex = /(https?:\/\/(www\.)?linkedin\.com\/[^\s]+|LinkedIn)/gi
+        const parts = text.split(linkedInRegex)
+        const matches: string[] = text.match(linkedInRegex) || []
+
+        return (
+            <Text style={[styles.sectionText, { color: colors.text }]}>
+                {parts.map((part, index) => {
+                    const isLinkedIn = matches.includes(part)
+                    if (isLinkedIn) {
+                        const url = part.toLowerCase().includes('http') 
+                            ? part 
+                            : contact?.linkedInUrl || `https://linkedin.com`
+                        return (
+                            <Text
+                                key={index}
+                                style={[styles.linkedInText, { color: colors.accent }]}
+                                onPress={() => Linking.openURL(url)}
+                            >
+                                {part}
+                            </Text>
+                        )
+                    }
+                    return <Text key={index}>{part}</Text>
+                })}
+            </Text>
+        )
+    }
+
     if (!contact) {
         return (
-            <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
-                <Ionicons name="alert-circle-outline" size={64} color={colors.danger} />
-                <Text style={styles.emptyText}>No contact data found</Text>
-                <Button onPress={() => router.back()} style={{ marginTop: spacing.lg }}>
-                    Go Back
-                </Button>
-            </View>
+            <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+                <View style={styles.emptyContainer}>
+                    <Ionicons name="alert-circle-outline" size={64} color={colors.danger} />
+                    <Text style={[styles.emptyText, { color: colors.text }]}>No contact data found</Text>
+                    <Pressable
+                        style={({ pressed }) => [
+                            styles.backButton,
+                            { opacity: pressed ? 0.7 : 1 }
+                        ]}
+                        onPress={() => router.back()}
+                    >
+                        <Text style={[styles.backButtonText, { color: colors.accent }]}>Go Back</Text>
+                    </Pressable>
+                </View>
+            </SafeAreaView>
         )
     }
 
     return (
-        <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
             {/* Header */}
             <View style={styles.header}>
-                <Pressable style={styles.backButton} onPress={handleDiscard}>
-                    <Ionicons name="close" size={24} color={colors.text} />
+                <Pressable
+                    style={({ pressed }) => [styles.headerButton, { opacity: pressed ? 0.7 : 1 }]}
+                    onPress={handleDiscard}
+                >
+                    <Ionicons name="chevron-back" size={28} color={colors.text} />
                 </Pressable>
-                <Text style={{ fontSize: 18, fontWeight: '600' }}>Review Contact</Text>
+
+                {/* Progress Pills */}
+                <View style={styles.progressContainer}>
+                    <View style={[styles.progressPill, styles.progressPillActive, { backgroundColor: colors.accent }]} />
+                    <View style={[styles.progressPill, styles.progressPillActive, { backgroundColor: colors.accent }]} />
+                    <View style={[styles.progressPill, { backgroundColor: colors.border }]} />
+                </View>
+
                 <View style={{ width: 40 }} />
             </View>
 
             <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-                {/* Profile Section */}
-                <View style={styles.profileSection}>
-                    <View style={styles.avatarContainer}>
+                {/* Card Image Section */}
+                <View style={styles.cardImageSection}>
+                    <View style={styles.cardImageContainer}>
                         {contact.imageUri ? (
-                            <Image source={{ uri: contact.imageUri }} style={styles.avatar} contentFit="cover" />
+                            <Image
+                                source={{ uri: contact.imageUri }}
+                                style={styles.cardImage}
+                                contentFit="cover"
+                            />
                         ) : (
-                            <View style={[styles.avatar, { backgroundColor: colors.border, justifyContent: 'center', alignItems: 'center' }]}>
-                                <Text style={{ fontSize: 32, fontWeight: '600', color: colors.secondary }}>
-                                    {contact.name?.charAt(0).toUpperCase() || '?'}
-                                </Text>
+                            <View style={[styles.cardImage, { backgroundColor: colors.surface, justifyContent: 'center', alignItems: 'center' }]}>
+                                <Ionicons name="image-outline" size={48} color={colors.border} />
                             </View>
                         )}
                     </View>
-                    <Text style={[styles.name, { color: colors.text }]}>{contact.name}</Text>
-                    <Text style={[styles.title, { color: colors.secondary }]}>
-                        {contact.title}{contact.company ? `, ${contact.company}` : ''}
+                </View>
+
+                {/* Name */}
+                <View style={styles.nameSection}>
+                    <Text style={[styles.nameText, { color: colors.text }]}>
+                        {contact.name || 'Unknown'}
                     </Text>
                 </View>
 
-                {/* Contact Info Card */}
-                <View style={styles.section}>
-                    <View style={styles.card}>
-                        {contact.phone && <InfoRow icon="call" text={contact.phone} />}
-                        {contact.email && <InfoRow icon="mail" text={contact.email} />}
-                        {contact.address && <InfoRow icon="location" text={contact.address} />}
-                        {contact.website && <InfoRow icon="globe" text={contact.website} />}
-                    </View>
+                {/* Job Title */}
+                <View style={styles.jobTitleSection}>
+                    <Text style={[styles.jobTitle, { color: colors.secondary }]}>
+                        {contact.title}{contact.company ? ` at ${contact.company}` : ''}
+                    </Text>
                 </View>
 
-                {/* AI Summaries */}
-                {(contact.personSummary || contact.companySummary) && (
-                    <View style={styles.section}>
-                        {contact.personSummary && (
-                            <View style={styles.summaryCard}>
-                                <View style={styles.pillHeader}>
-                                    <Ionicons name="person" size={12} color={colors.accent} style={{ marginRight: 4 }} />
-                                    <Text style={[styles.pillText, { color: colors.accent }]}>AI Person Summary</Text>
-                                </View>
-                                <Text style={[styles.bodyText, { color: colors.text }]}>{contact.personSummary}</Text>
-                            </View>
-                        )}
-                        {contact.companySummary && (
-                            <View style={[styles.summaryCard, { marginTop: spacing.md }]}>
-                                <View style={styles.pillHeader}>
-                                    <Ionicons name="business" size={12} color={colors.accent} style={{ marginRight: 4 }} />
-                                    <Text style={[styles.pillText, { color: colors.accent }]}>AI Company Summary</Text>
-                                </View>
-                                <Text style={[styles.bodyText, { color: colors.text }]}>{contact.companySummary}</Text>
-                            </View>
-                        )}
+                {/* Summary About the Person */}
+                {contact.personSummary && (
+                    <View style={styles.sectionContainer}>
+                        <Text style={[styles.sectionLabel, { color: colors.tertiary }]}>
+                            SUMMARY ABOUT THE PERSON
+                        </Text>
+                        <View style={[styles.sectionCard, { backgroundColor: colors.surface }]}>
+                            {renderTextWithLinks(contact.personSummary)}
+                        </View>
                     </View>
                 )}
 
+                {/* Summary About the Company */}
+                {contact.companySummary && (
+                    <View style={styles.sectionContainer}>
+                        <Text style={[styles.sectionLabel, { color: colors.tertiary }]}>
+                            SUMMARY ABOUT THE COMPANY
+                        </Text>
+                        <View style={[styles.sectionCard, { backgroundColor: colors.surface }]}>
+                            {renderTextWithLinks(contact.companySummary)}
+                        </View>
+                    </View>
+                )}
+
+                {/* Conversation Starters */}
+                {contact.conversationStarters && contact.conversationStarters.length > 0 && (
+                    <View style={styles.sectionContainer}>
+                        <Text style={[styles.sectionLabel, { color: colors.tertiary }]}>
+                            CONVERSATION STARTERS
+                        </Text>
+                        <View style={[styles.sectionCard, { backgroundColor: colors.surface }]}>
+                            {contact.conversationStarters.map((starter: string, index: number) => (
+                                <View key={index} style={index > 0 ? styles.conversationItem : undefined}>
+                                    {renderTextWithLinks(starter)}
+                                </View>
+                            ))}
+                        </View>
+                    </View>
+                )}
+
+                <View style={{ height: 100 }} />
             </ScrollView>
 
+            {/* Continue Button */}
             <View style={styles.footer}>
-                <Button
-                    variant="primary"
+                <Pressable
+                    style={({ pressed }) => [
+                        styles.continueButton,
+                        {
+                            backgroundColor: colors.accent,
+                            opacity: pressed ? 0.9 : 1
+                        }
+                    ]}
                     onPress={handleSave}
-                    style={styles.saveButton}
-                    textStyle={{ fontSize: 18, fontWeight: '600' }}
                 >
-                    Save Contact
-                </Button>
+                    <Text style={styles.continueButtonText}>Continue</Text>
+                </Pressable>
             </View>
-        </View>
+        </SafeAreaView>
     )
 }
 
-// Helper for Contact Info Rows
-function InfoRow({ icon, text }: { icon: string; text: string }) {
-    const colors = useColors()
-    return (
-        <View style={styles.infoRow}>
-            <View style={[styles.infoIconContainer, { backgroundColor: '#F0F5FF' }]}>
-                <Ionicons name={icon as any} size={20} color={colors.accent} />
-            </View>
-            <Text style={[styles.infoText, { color: colors.text }]}>{text}</Text>
-        </View>
-    )
-}
-
-const styles = StyleSheet.create({
+const createStyles = (colors: Colors) => StyleSheet.create({
     container: {
         flex: 1,
+        backgroundColor: colors.background,
+    },
+    emptyContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingHorizontal: spacing.lg,
+        gap: spacing.lg,
+    },
+    emptyText: {
+        fontSize: fontSize.lg,
+        fontWeight: '600',
+        textAlign: 'center',
+    },
+    backButton: {
+        paddingHorizontal: spacing.lg,
+        paddingVertical: spacing.md,
+    },
+    backButtonText: {
+        fontSize: fontSize.base,
+        fontWeight: '600',
     },
     header: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
         paddingHorizontal: spacing.lg,
-        paddingTop: spacing.xl + 20,
-        paddingBottom: spacing.sm,
+        paddingVertical: spacing.md,
     },
-    backButton: {
-        padding: spacing.xs,
-    },
-    scrollContent: {
-        paddingBottom: 100,
-    },
-    profileSection: {
-        alignItems: 'center',
-        marginTop: spacing.sm,
-        marginBottom: spacing.xl,
-        paddingHorizontal: spacing.xl,
-    },
-    avatarContainer: {
-        marginBottom: spacing.md,
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.1,
-        shadowRadius: 8,
-        elevation: 5,
-    },
-    avatar: {
-        width: 100,
-        height: 100,
-        borderRadius: 50,
-    },
-    name: {
-        fontSize: 22,
-        fontWeight: '700',
-        textAlign: 'center',
-        marginBottom: 4,
-    },
-    title: {
-        fontSize: 16,
-        textAlign: 'center',
-    },
-    section: {
-        paddingHorizontal: spacing.lg,
-        marginBottom: spacing.md,
-    },
-    card: {
-        backgroundColor: '#fff',
-        borderRadius: 24,
-        padding: spacing.lg,
-        gap: spacing.md,
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 8,
-        elevation: 2,
-    },
-    infoRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: spacing.md,
-    },
-    infoIconContainer: {
+    headerButton: {
         width: 40,
         height: 40,
         borderRadius: 20,
         justifyContent: 'center',
         alignItems: 'center',
     },
-    infoText: {
-        fontSize: 16,
-        flex: 1,
-    },
-    summaryCard: {
-        backgroundColor: '#fff',
-        borderRadius: 16,
-        padding: spacing.lg,
-    },
-    pillHeader: {
+    progressContainer: {
         flexDirection: 'row',
+        gap: spacing.sm,
+        justifyContent: 'center',
+    },
+    progressPill: {
+        height: 6,
+        borderRadius: 3,
+        width: 40,
+    },
+    progressPillActive: {
+        width: 60,
+    },
+    scrollContent: {
+        paddingBottom: 120,
+    },
+    // Card Image Section
+    cardImageSection: {
+        paddingHorizontal: spacing.lg,
+        marginTop: spacing.md,
+        marginBottom: spacing.lg,
         alignItems: 'center',
-        backgroundColor: '#F0F5FF',
-        alignSelf: 'flex-start',
-        paddingVertical: 6,
-        paddingHorizontal: 12,
-        borderRadius: 16,
-        marginBottom: spacing.md,
     },
-    pillText: {
-        fontSize: 12,
-        fontWeight: '600',
+    cardImageContainer: {
+        width: '80%',
+        maxWidth: 300,
+        backgroundColor: colors.surface,
+        borderRadius: borderRadius.lg,
+        padding: spacing.md,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 8,
+        elevation: 3,
     },
-    bodyText: {
-        fontSize: 15,
+    cardImage: {
+        width: '100%',
+        height: 160,
+        borderRadius: borderRadius.md,
+        overflow: 'hidden',
+    },
+    // Name Section
+    nameSection: {
+        paddingHorizontal: spacing.lg,
+        marginBottom: spacing.sm,
+        alignItems: 'center',
+    },
+    nameText: {
+        fontSize: fontSize.xl,
+        fontWeight: '700',
+        textAlign: 'center',
+    },
+    // Job Title
+    jobTitleSection: {
+        paddingHorizontal: spacing.lg,
+        marginBottom: spacing.lg,
+        alignItems: 'center',
+    },
+    jobTitle: {
+        fontSize: fontSize.base,
+        textAlign: 'center',
         lineHeight: 22,
     },
+    // Summary Sections
+    sectionContainer: {
+        paddingHorizontal: spacing.lg,
+        marginBottom: spacing.lg,
+    },
+    sectionLabel: {
+        fontSize: fontSize.xs,
+        fontWeight: '600',
+        marginBottom: spacing.sm,
+        letterSpacing: 0.5,
+    },
+    sectionCard: {
+        borderRadius: borderRadius.lg,
+        padding: spacing.lg,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.05,
+        shadowRadius: 4,
+        elevation: 2,
+    },
+    sectionText: {
+        fontSize: fontSize.base,
+        lineHeight: 24,
+    },
+    linkedInText: {
+        textDecorationLine: 'underline',
+    },
+    conversationItem: {
+        marginTop: spacing.md,
+    },
+    // Footer
     footer: {
-        width: '100%',
         position: 'absolute',
         bottom: 0,
-        padding: spacing.lg,
-        backgroundColor: 'rgba(255,255,255,0.9)',
+        left: 0,
+        right: 0,
+        paddingHorizontal: spacing.lg,
+        paddingVertical: spacing.lg,
+        backgroundColor: colors.background,
+        borderTopWidth: 1,
+        borderTopColor: colors.border,
     },
-    saveButton: {
+    continueButton: {
         height: 56,
-        borderRadius: 28,
-    },
-    actionButtonContainer: {
-        alignItems: 'center',
-        gap: 8,
-    },
-    actionButton: {
-        width: 50,
-        height: 50,
-        borderRadius: 25,
+        borderRadius: borderRadius.full,
         justifyContent: 'center',
         alignItems: 'center',
+        shadowColor: colors.accent,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+        elevation: 5,
     },
-    actionLabel: {
-        fontSize: 12,
-        fontWeight: '500',
-    },
-    emptyText: {
-        fontSize: 16,
-        textAlign: 'center',
-        marginTop: 16,
+    continueButtonText: {
+        color: '#fff',
+        fontSize: fontSize.lg,
+        fontWeight: '600',
     },
 })
 

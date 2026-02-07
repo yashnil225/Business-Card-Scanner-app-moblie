@@ -11,7 +11,7 @@ import { Button, Text } from '@/src/components/ui'
 import { useAuthStore } from '@/src/features/auth'
 import { useColors } from '@/src/hooks/useColors'
 import { queryClient } from '@/src/lib/queryClient'
-import { useNotificationStore } from '@/src/stores/notificationStore'
+import { useNotificationStore, useUserStore } from '@/src/stores'
 
 function LoadingScreen() {
   const colors = useColors()
@@ -73,6 +73,9 @@ function RootLayoutNav() {
   const initialize = useAuthStore((state) => state.initialize)
   const setupAuthListener = useAuthStore((state) => state.setupAuthListener)
   const ensureToken = useNotificationStore((state) => state.ensureToken)
+  const user = useUserStore((state) => state.user)
+  const hasUser = useUserStore((state) => state.hasUser)
+  const hasCompletedOnboarding = useUserStore((state) => state.hasCompletedOnboarding)
   const segments = useSegments()
   const router = useRouter()
 
@@ -104,17 +107,35 @@ function RootLayoutNav() {
     return () => subscription.remove()
   }, [ensureToken, session?.user?.id])
 
-  // Handle navigation based on auth state
+  // Handle navigation based on user and onboarding state
   useEffect(() => {
     if (!isInitialized || initError) return
 
     const inTabsGroup = segments[0] === '(tabs)'
+    const inAuthGroup = segments[0] === '(auth)'
+    const inScanGroup = segments[0] === '(scan)'
 
-    // With mock auth, always redirect to tabs if not already there
-    if (session && !inTabsGroup) {
+    // Check if user has completed onboarding flow
+    const userExists = hasUser()
+    const onboardingComplete = hasCompletedOnboarding()
+
+    // If no user exists and not in auth group, redirect to get-started
+    if (!userExists && !inAuthGroup) {
+      router.replace('/(auth)/get-started')
+      return
+    }
+
+    // If user exists but hasn't completed onboarding, redirect to onboarding
+    if (userExists && !onboardingComplete && !inAuthGroup && !inScanGroup) {
+      router.replace('/(auth)/onboarding')
+      return
+    }
+
+    // If user exists and completed onboarding, and not in a valid group, go to tabs
+    if (userExists && onboardingComplete && !inTabsGroup && !inAuthGroup && !inScanGroup) {
       router.replace('/(tabs)')
     }
-  }, [session, isInitialized, segments, router, initError])
+  }, [isInitialized, segments, router, initError, user, hasUser, hasCompletedOnboarding])
 
   if (initError) {
     return (
