@@ -1,11 +1,19 @@
-import type { Session, User } from '@supabase/supabase-js'
-import { Platform } from 'react-native'
+import AsyncStorage from '@react-native-async-storage/async-storage'
 import { create } from 'zustand'
+import { createJSONStorage, persist } from 'zustand/middleware'
 
-import { deleteAuthUser } from '@/src/lib/api'
-import { queryClient } from '@/src/lib/queryClient'
-import { supabase } from '@/src/lib/supabase'
 import { useNotificationStore } from '@/src/stores/notificationStore'
+import type { User } from '@/src/types/database'
+
+// Mock Session type to maintain compatibility with existing code if needed,
+// or simplify to just user authentication state.
+type Session = {
+  access_token: string
+  refresh_token: string
+  expires_in: number
+  token_type: string
+  user: User
+}
 
 type AuthState = {
   session: Session | null
@@ -18,8 +26,8 @@ type AuthState = {
 type AuthActions = {
   initialize: () => Promise<void>
   signIn: (email: string, password: string) => Promise<void>
-  signInWithGoogle: () => Promise<void>
-  signInWithApple: () => Promise<void>
+  signInWithGoogle: () => Promise<void> // Kept as placeholder/mock
+  signInWithApple: () => Promise<void> // Kept as placeholder/mock
   signInAnonymously: () => Promise<void>
   signUp: (email: string, password: string) => Promise<void>
   signOut: () => Promise<void>
@@ -27,371 +35,282 @@ type AuthActions = {
   resetPassword: (email: string) => Promise<void>
   updatePassword: (password: string) => Promise<void>
   setupAuthListener: () => () => void
+  updateUserProfile: (updates: Partial<User>) => Promise<void>
 }
 
 type AuthStore = AuthState & AuthActions
 
-export const useAuthStore = create<AuthStore>((set, get) => ({
-  session: null,
-  user: null,
-  isLoading: false,
-  isInitialized: false,
-  initError: null,
+// Helper to simulate API delay
+const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
-  setupAuthListener: () => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      set({
-        session,
-        user: session?.user ?? null,
-      })
+// Storage keys
+const USERS_STORAGE_KEY = 'local_users_db'
 
-      // Ensure push token stays in sync when auth state changes
-      if (session?.user?.id) {
-        void useNotificationStore.getState().ensureToken(session.user.id)
-      }
-    })
+export const useAuthStore = create<AuthStore>()(
+  persist(
+    (set, get) => ({
+      session: null,
+      user: null,
+      isLoading: false,
+      isInitialized: false,
+      initError: null,
 
-    return () => {
-      subscription.unsubscribe()
-    }
-  },
+      setupAuthListener: () => {
+        // No-op for local auth, as state is managed synchronously/locally
+        return () => { }
+      },
 
-  initialize: async () => {
-    const { isInitialized, initError } = get()
-    if (isInitialized && !initError) return
+      initialize: async () => {
+        set({ isInitialized: true, initError: null })
+      },
 
-    // Reset init state when retrying after a failure
-    if (initError) {
-      set({ isInitialized: false, initError: null })
-    }
+      signIn: async (email, password) => {
+        set({ isLoading: true })
+        try {
+          await delay(500) // Simulate network delay
 
-    try {
-      // TESTING MODE: Create a mock session to bypass authentication
-      const TESTING_MODE = true // Set to false to use real Supabase auth
+          const usersJson = await AsyncStorage.getItem(USERS_STORAGE_KEY)
+          const users: Record<string, User & { password: string }> = usersJson ? JSON.parse(usersJson) : {}
 
-      if (TESTING_MODE) {
-        const mockSession = {
-          access_token: 'mock-token-12345',
-          refresh_token: 'mock-refresh-token',
-          expires_in: 3600,
-          token_type: 'bearer',
-          user: {
-            id: 'mock-user-id-12345',
-            email: 'test@example.com',
+          const userKey = email.toLowerCase()
+          const userRecord = users[userKey]
+
+          if (!userRecord || userRecord.password !== password) {
+            throw new Error('Invalid email or password')
+          }
+
+          // Create session
+          const session: Session = {
+            access_token: 'local-mock-token-' + Date.now(),
+            refresh_token: 'local-mock-refresh-' + Date.now(),
+            expires_in: 3600,
+            token_type: 'bearer',
+            user: userRecord,
+          }
+
+          set({ session, user: userRecord })
+
+          if (userRecord.id) {
+            void useNotificationStore.getState().registerAndSaveToken(userRecord.id)
+          }
+
+        } catch (error) {
+          throw error instanceof Error ? error : new Error('Sign in failed')
+        } finally {
+          set({ isLoading: false })
+        }
+      },
+
+      signUp: async (email, password) => {
+        set({ isLoading: true })
+        try {
+          await delay(500)
+
+          // Get existing users
+          const usersJson = await AsyncStorage.getItem(USERS_STORAGE_KEY)
+          const users: Record<string, User & { password: string }> = usersJson ? JSON.parse(usersJson) : {}
+
+          const userKey = email.toLowerCase()
+
+          if (users[userKey]) {
+            throw new Error('User already exists')
+          }
+
+          // Create new user
+          const newUser: User = {
+            id: 'local-user-' + Date.now(),
+            email: email,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            full_name: '',
+            avatar_url: '',
+            app_metadata: {},
+            user_metadata: {},
             aud: 'authenticated',
-            role: 'authenticated',
+            role: 'authenticated'
+          }
+
+          // Save to storage with password
+          users[userKey] = { ...newUser, password }
+          await AsyncStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(users))
+
+          // Create session
+          const session: Session = {
+            access_token: 'local-mock-token-' + Date.now(),
+            refresh_token: 'local-mock-refresh-' + Date.now(),
+            expires_in: 3600,
+            token_type: 'bearer',
+            user: newUser,
+          }
+
+          set({ session, user: newUser })
+          if (newUser.id) {
+            void useNotificationStore.getState().registerAndSaveToken(newUser.id)
+          }
+        } catch (error) {
+          throw error instanceof Error ? error : new Error('Sign up failed')
+        } finally {
+          set({ isLoading: false })
+        }
+      },
+
+      signInWithGoogle: async () => {
+        // Mock/Placeholder
+        set({ isLoading: true })
+        try {
+          await delay(1000)
+          const mockUser: User = {
+            id: 'google-mock-' + Date.now(),
+            email: 'google@example.com',
+            full_name: 'Google User',
+            avatar_url: 'https://via.placeholder.com/150',
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
             app_metadata: {},
             user_metadata: {},
-          },
-        } as Session
+            aud: 'authenticated',
+            role: 'authenticated'
+          }
 
-        set({
-          session: mockSession,
-          user: mockSession.user,
-          isInitialized: true,
-          initError: null,
-        })
-        return
-      }
+          const session: Session = {
+            access_token: 'mock-google-token',
+            refresh_token: 'mock-google-refresh',
+            expires_in: 3600,
+            token_type: 'bearer',
+            user: mockUser
+          }
+          set({ session, user: mockUser })
+        } finally {
+          set({ isLoading: false })
+        }
+      },
 
-      const { data, error } = await supabase.auth.getSession()
-      if (error) throw error
-
-      const session = data.session
-      const user = session?.user ?? null
-
-      set({
-        session: data.session,
-        user,
-        isInitialized: true,
-        initError: null,
-      })
-
-      // Ensure push token is registered for returning users (cold start)
-      if (session?.user?.id) {
-        void useNotificationStore.getState().ensureToken(session.user.id)
-      }
-    } catch (error) {
-      const authError = error instanceof Error ? error : new Error('Auth initialization failed')
-      console.error('Auth initialization failed:', authError)
-      set({
-        isInitialized: true,
-        initError: authError,
-      })
-    }
-  },
-
-  signIn: async (email: string, password: string) => {
-    set({ isLoading: true })
-
-    try {
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password })
-      if (error) throw error
-
-      const userId = data.user?.id ?? data.session?.user.id ?? get().user?.id
-      if (userId) {
-        await useNotificationStore.getState().registerAndSaveToken(userId)
-      }
-    } catch (error) {
-      const authError = error instanceof Error ? error : new Error('Sign in failed')
-      throw authError
-    } finally {
-      set({ isLoading: false })
-    }
-  },
-
-  signInWithGoogle: async () => {
-    set({ isLoading: true })
-
-    try {
-      // Dynamically import GoogleSignin to avoid crashing in Expo Go
-      const { GoogleSignin } = await import('@react-native-google-signin/google-signin')
-
-      // Configure GoogleSignin (safe to call multiple times)
-      GoogleSignin.configure({
-        webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
-        iosClientId: Platform.OS === 'ios' ? process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID : undefined,
-      })
-
-      // Check for Play Services (Android) or just proceed (iOS)
-      await GoogleSignin.hasPlayServices()
-
-      // Trigger the native Google Sign-In flow
-      const response = await GoogleSignin.signIn()
-
-      if (!response.data?.idToken) {
-        throw new Error('No ID token received from Google')
-      }
-
-      // Exchange the Google ID token for a Supabase session
-      const { data, error } = await supabase.auth.signInWithIdToken({
-        provider: 'google',
-        token: response.data.idToken,
-      })
-
-      if (error) throw error
-
-      const userId = data.user?.id ?? data.session?.user.id ?? get().user?.id
-      if (userId) {
-        const profileName =
-          response.data.user?.name ??
-          [response.data.user?.givenName, response.data.user?.familyName]
-            .filter(Boolean)
-            .join(' ')
-            .trim()
-        const normalizedName = profileName && profileName.length > 0 ? profileName : null
-        const profilePhoto = response.data.user?.photo ?? null
-        const profileEmail = response.data.user?.email ?? data.user?.email ?? null
-
+      signInWithApple: async () => {
+        set({ isLoading: true })
         try {
-          if (normalizedName || profilePhoto) {
-            await supabase.auth.updateUser({
-              data: {
-                full_name: normalizedName,
-                avatar_url: profilePhoto,
-              },
-            })
+          await delay(1000)
+          const mockUser: User = {
+            id: 'apple-mock-' + Date.now(),
+            email: 'apple@example.com',
+            full_name: 'Apple User',
+            avatar_url: null,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            app_metadata: {},
+            user_metadata: {},
+            aud: 'authenticated',
+            role: 'authenticated'
           }
 
-          const profileUpdate: { id: string; display_name?: string | null; photo_url?: string | null; email?: string | null } =
-            { id: userId }
-
-          if (normalizedName) profileUpdate.display_name = normalizedName
-          if (profilePhoto) profileUpdate.photo_url = profilePhoto
-          if (profileEmail) profileUpdate.email = profileEmail
-
-          if (Object.keys(profileUpdate).length > 1) {
-            await supabase.from('users').upsert(profileUpdate, { onConflict: 'id' })
+          const session: Session = {
+            access_token: 'mock-apple-token',
+            refresh_token: 'mock-apple-refresh',
+            expires_in: 3600,
+            token_type: 'bearer',
+            user: mockUser
           }
-        } catch (profileError) {
-          console.warn('Failed to update Google profile details:', profileError)
+          set({ session, user: mockUser })
+        } finally {
+          set({ isLoading: false })
+        }
+      },
+
+      signInAnonymously: async () => {
+        set({ isLoading: true })
+        try {
+          await delay(500)
+          const mockUser: User = {
+            id: 'anon-' + Date.now(),
+            email: undefined,
+            full_name: 'Guest',
+            avatar_url: null,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            app_metadata: {},
+            user_metadata: {},
+            aud: 'authenticated',
+            role: 'authenticated'
+          }
+
+          const session: Session = {
+            access_token: 'mock-anon-token',
+            refresh_token: 'mock-anon-refresh',
+            expires_in: 3600,
+            token_type: 'bearer',
+            user: mockUser
+          }
+          set({ session, user: mockUser })
+        } finally {
+          set({ isLoading: false })
+        }
+      },
+
+      signOut: async () => {
+        set({ session: null, user: null })
+        useNotificationStore.getState().clearToken()
+      },
+
+      deleteAccount: async () => {
+        const { user } = get()
+        if (!user || !user.email) return
+
+        const usersJson = await AsyncStorage.getItem(USERS_STORAGE_KEY)
+        if (usersJson) {
+          const users: Record<string, User> = JSON.parse(usersJson)
+          delete users[user.email.toLowerCase()]
+          await AsyncStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(users))
         }
 
-        await useNotificationStore.getState().registerAndSaveToken(userId)
-      }
-    } catch (error) {
-      const authError = error instanceof Error ? error : new Error('Google sign in failed')
-      throw authError
-    } finally {
-      set({ isLoading: false })
-    }
-  },
+        set({ session: null, user: null })
+      },
 
-  signInWithApple: async () => {
-    if (Platform.OS !== 'ios') {
-      throw new Error('Apple Sign-In is only available on iOS')
-    }
+      resetPassword: async (email) => {
+        await delay(500)
+        console.log('Mock password reset for:', email)
+      },
 
-    set({ isLoading: true })
+      updatePassword: async (password) => {
+        const { user } = get()
+        if (!user || !user.email) throw new Error('No user logged in')
 
-    try {
-      const AppleAuthentication = await import('expo-apple-authentication')
+        const usersJson = await AsyncStorage.getItem(USERS_STORAGE_KEY)
+        const users = usersJson ? JSON.parse(usersJson) : {}
 
-      // Check if Apple Sign-In is available on this device
-      const isAvailable = await AppleAuthentication.isAvailableAsync()
-      if (!isAvailable) {
-        throw new Error('Apple Sign-In is not available on this device')
-      }
-
-      // Request credentials from Apple
-      const credential = await AppleAuthentication.signInAsync({
-        requestedScopes: [
-          AppleAuthentication.AppleAuthenticationScope.EMAIL,
-          AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
-        ],
-      })
-
-      if (!credential.identityToken) {
-        throw new Error('No identity token received from Apple')
-      }
-
-      // Exchange the Apple identity token for a Supabase session
-      const { data, error } = await supabase.auth.signInWithIdToken({
-        provider: 'apple',
-        token: credential.identityToken,
-      })
-
-      if (error) throw error
-
-      const userId = data.user?.id ?? data.session?.user.id ?? get().user?.id
-      if (userId) {
-        await useNotificationStore.getState().registerAndSaveToken(userId)
-      }
-    } catch (error) {
-      // Handle user cancellation gracefully
-      if (error && typeof error === 'object' && 'code' in error) {
-        const appleError = error as { code: string }
-        if (appleError.code === 'ERR_REQUEST_CANCELED') {
-          throw new Error('Sign in was cancelled')
+        if (users[user.email.toLowerCase()]) {
+          users[user.email.toLowerCase()].password = password
+          await AsyncStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(users))
         }
+      },
+
+      updateUserProfile: async (updates) => {
+        const { user } = get()
+        if (!user || !user.email) return // Anonymous users might not persist profile changes in this simple mock
+
+        const updatedUser = { ...user, ...updates, updated_at: new Date().toISOString() }
+
+        // Update in storage
+        const usersJson = await AsyncStorage.getItem(USERS_STORAGE_KEY)
+        const users = usersJson ? JSON.parse(usersJson) : {}
+
+        if (users[user.email.toLowerCase()]) {
+          // Preserve password if it exists on the record (it should)
+          const currentRecord = users[user.email.toLowerCase()]
+          users[user.email.toLowerCase()] = { ...currentRecord, ...updatedUser }
+          await AsyncStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(users))
+        }
+
+        // Update in state
+        // Need to update session.user as well if session exists
+        const currentSession = get().session
+        const updatedSession = currentSession ? { ...currentSession, user: updatedUser } : null
+
+        set({ user: updatedUser, session: updatedSession })
       }
-      const authError = error instanceof Error ? error : new Error('Apple sign in failed')
-      throw authError
-    } finally {
-      set({ isLoading: false })
+    }),
+    {
+      name: 'auth-storage',
+      storage: createJSONStorage(() => AsyncStorage),
+      partialize: (state) => ({ session: state.session, user: state.user }),
     }
-  },
-
-  signInAnonymously: async () => {
-    set({ isLoading: true })
-
-    try {
-      const { data, error } = await supabase.auth.signInAnonymously()
-      if (error) throw error
-
-      const userId = data.user?.id ?? data.session?.user.id
-      if (userId) {
-        await useNotificationStore.getState().registerAndSaveToken(userId)
-      }
-    } catch (error) {
-      const authError = error instanceof Error ? error : new Error('Anonymous sign in failed')
-      throw authError
-    } finally {
-      set({ isLoading: false })
-    }
-  },
-
-  signUp: async (email: string, password: string) => {
-    set({ isLoading: true })
-
-    try {
-      const { data, error } = await supabase.auth.signUp({ email, password })
-      if (error) throw error
-
-      const userId = data.user?.id ?? data.session?.user.id ?? get().user?.id
-      if (userId) {
-        await useNotificationStore.getState().registerAndSaveToken(userId)
-      }
-    } catch (error) {
-      const authError = error instanceof Error ? error : new Error('Sign up failed')
-      throw authError
-    } finally {
-      set({ isLoading: false })
-    }
-  },
-
-  signOut: async () => {
-    set({ isLoading: true })
-
-    try {
-      const userId = get().user?.id
-
-      if (userId) {
-        await useNotificationStore.getState().removeToken(userId)
-      }
-
-      const { error } = await supabase.auth.signOut()
-      if (error) throw error
-
-      useNotificationStore.getState().clearToken()
-
-      // Clear any user-specific client state after sign out
-      queryClient.clear()
-    } catch (error) {
-      const authError = error instanceof Error ? error : new Error('Sign out failed')
-      throw authError
-    } finally {
-      set({ isLoading: false })
-    }
-  },
-
-  deleteAccount: async () => {
-    set({ isLoading: true })
-
-    try {
-      const userId = get().user?.id
-
-      if (!userId) {
-        throw new Error('No authenticated user found')
-      }
-
-      await deleteAuthUser(userId)
-
-      try {
-        await supabase.auth.signOut()
-      } catch (signOutError) {
-        console.warn('Failed to sign out after account deletion:', signOutError)
-      }
-
-      useNotificationStore.getState().clearToken()
-      queryClient.clear()
-
-      set({ session: null, user: null })
-    } catch (error) {
-      const authError = error instanceof Error ? error : new Error('Account deletion failed')
-      throw authError
-    } finally {
-      set({ isLoading: false })
-    }
-  },
-
-  resetPassword: async (email: string) => {
-    set({ isLoading: true })
-
-    try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email)
-      if (error) throw error
-    } catch (error) {
-      const authError = error instanceof Error ? error : new Error('Password reset failed')
-      throw authError
-    } finally {
-      set({ isLoading: false })
-    }
-  },
-
-  updatePassword: async (password: string) => {
-    set({ isLoading: true })
-
-    try {
-      const { error } = await supabase.auth.updateUser({ password })
-      if (error) throw error
-    } catch (error) {
-      const authError = error instanceof Error ? error : new Error('Password update failed')
-      throw authError
-    } finally {
-      set({ isLoading: false })
-    }
-  },
-}))
+  )
+)

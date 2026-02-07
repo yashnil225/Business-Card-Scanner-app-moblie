@@ -1,9 +1,7 @@
-import * as Notifications from 'expo-notifications'
-import * as Device from 'expo-device'
 import Constants from 'expo-constants'
+import * as Device from 'expo-device'
+import * as Notifications from 'expo-notifications'
 import { Platform } from 'react-native'
-
-import { supabase } from './supabase'
 
 // Configure how notifications are handled when the app is in the foreground
 Notifications.setNotificationHandler({
@@ -14,18 +12,6 @@ Notifications.setNotificationHandler({
     shouldSetBadge: false,
   }),
 })
-
-const FUTURE_JWT_ERROR_CODE = 'PGRST303'
-const TOKEN_SAVE_MAX_ATTEMPTS = 3
-
-function isFutureJwtError(error: unknown): boolean {
-  if (!error || typeof error !== 'object') return false
-  return 'code' in error && (error as { code?: string }).code === FUTURE_JWT_ERROR_CODE
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms))
-}
 
 /**
  * Request notification permissions from the user
@@ -57,7 +43,8 @@ export async function getExpoPushToken(): Promise<string | null> {
   // Get project ID from Expo config
   const projectId =
     Constants?.expoConfig?.extra?.eas?.projectId ??
-    Constants?.easConfig?.projectId
+    Constants?.easConfig?.projectId ??
+    Constants?.expoConfig?.extra?.eas?.projectId
 
   if (!projectId) {
     console.error('Project ID not found in Expo config')
@@ -102,49 +89,19 @@ export async function registerForPushNotifications(): Promise<string | null> {
 }
 
 /**
- * Save the push token to the devices table in Supabase
- * This stores a token per device for a user
+ * Mock saving token (formerly to Supabase)
  */
 export async function savePushTokenToDevice(userId: string, token: string): Promise<void> {
-  for (let attempt = 1; attempt <= TOKEN_SAVE_MAX_ATTEMPTS; attempt += 1) {
-    const { error } = await supabase.from('devices').upsert(
-      { user_id: userId, fcm_token: token },
-      { onConflict: 'user_id,fcm_token' }
-    )
-
-    if (!error) return
-
-    if (isFutureJwtError(error) && attempt < TOKEN_SAVE_MAX_ATTEMPTS) {
-      await sleep(1000 * attempt)
-      continue
-    }
-
-    console.error('Failed to save push token:', error)
-    throw error
-  }
+  // No-op for local storage version
+  console.log('Mock saving push token for user:', userId, token)
 }
 
 /**
- * Remove the push token from the devices table in Supabase
+ * Mock removing token (formerly from Supabase)
  */
 export async function removePushTokenFromDevice(userId: string, token: string): Promise<void> {
-  for (let attempt = 1; attempt <= TOKEN_SAVE_MAX_ATTEMPTS; attempt += 1) {
-    const { error } = await supabase
-      .from('devices')
-      .delete()
-      .eq('user_id', userId)
-      .eq('fcm_token', token)
-
-    if (!error) return
-
-    if (isFutureJwtError(error) && attempt < TOKEN_SAVE_MAX_ATTEMPTS) {
-      await sleep(1000 * attempt)
-      continue
-    }
-
-    console.error('Failed to remove push token:', error)
-    throw error
-  }
+  // No-op for local storage version
+  console.log('Mock removing push token for user:', userId, token)
 }
 
 /**

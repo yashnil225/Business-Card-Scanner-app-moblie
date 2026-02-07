@@ -1,7 +1,8 @@
 export { queryClient } from './queryClient'
-export { supabase } from './supabase'
+
+export * from './companyUtils'
+export * from './dateUtils'
+export * from './notifications'
 export * from './theme'
 export * from './validations'
-export * from './notifications'
-export * from './dateUtils'
-export * from './companyUtils'
+
