@@ -13,8 +13,18 @@
       "android": {
         "buildType": "apk"
       },
-      "env": {
-      }
+      "env": {}
+    },
+    "development ": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "ios": {
+        "simulator": false
+      },
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {}
     },
     "production": {
       "distribution": "store",
