@@ -1,277 +1,38 @@
-# Mobile App Template (Expo/React Native)
+Over 2 million professionals have upgraded their business card scanning and lead capture with Covve Scan - join them today and experience unparalleled lead capture accuracy!
 
-A production-ready mobile app template built with Expo Router, Supabase Auth, and TanStack Query.
+Enjoy a free trial for 14 days, then unlock unlimited scans through a one-off purchase or annual subscription.
 
-## Features
+⚡ Unrivaled business card scanning accuracy and speed
+- Achieve market-leading business card scanning accuracy in over 60 languages and experience the fastest scan times, outperforming competitors like CamCard, ABBYY, and BizConnect.
+- Scan QR codes to create leads from online profiles, digital business cards, LinkedIn and more.
 
-- **Authentication**: Email/password auth with Supabase
-- **Push Notifications**: Full FCM/APNs support via expo-notifications
-- **State Management**: Zustand stores for auth, theme, and notifications
-- **Data Fetching**: TanStack Query with optimized caching
-- **Theming**: Light/dark/system mode support
-- **Error Handling**: Error boundaries for screens and global shell
-- **TypeScript**: Strict type checking throughout
-- **CI/CD**: Codemagic configuration for iOS builds
+📝 Organize and manage your business cards
+- Add notes, groups, and locations to your scanned business cards for easy organization.
+- Distil all your notes into a concise actionable summary.
+- Keep your business card organizer up to date with grouping, tagging and search.
+- Use AI-powered research and qualify your leads on the go, directly from their cards.
 
-## Quick Start
+🚀 Export and share your business cards
+- Save scanned business cards and leads directly to your phone contacts with one tap.
+- Export your cards to Excel, Outlook, or Google Contacts.
+- Share scanned business cards and leads with your team or assistant
+- Integrate with all leading CRMs; Salesforce, HubSpot, Zoho and more.
+- Integrate with any other platform using Zapier, ensuring every business card scan fits into your workflow.
 
-### 1. Clone and Install
+🔒 Private and Secure
+- Your scanned business cards are kept private, with terms and technology that safeguard your data.
+- Covve Scan is developed in Europe, ensuring top-tier privacy protection.
 
-```bash
-npm install
-```
+📈 Why choose Covve Scan
+Covve Scan is more than just a fast business card scanner – it’s a complete business card organizer and digital contact manager. From capturing every detail of your business cards and QRs with unrivaled accuracy to helping you manage, organize, and share, Covve Scan simplifies business card scanning like no other app.
 
-### 2. Configure Environment Variables
+"Just exceptional, a photo and everything fills in automatically. I bought the full version and it’s really great. In addition, you can export in CSV format – what a time saver! We tag keywords, and we easily find the contact. Thank you!"
+(Store review, "Ben Linus," 05 April 2025)
 
-Copy the example environment file:
+Covve Scan is brought to you by the award-winning team behind Covve: Personal CRM.
+Contact us anytime at support@covve.com.
 
-```bash
-cp .env.example .env
-```
-
-Edit `.env` with your Supabase credentials:
-
-```env
-EXPO_PUBLIC_SUPABASE_URL=https://your-project-id.supabase.co
-EXPO_PUBLIC_SUPABASE_PUB_KEY=your-anon-key-here
-APP_ENV=development
-```
-
-### 3. Update App Configuration
-
-Edit `app.json` and replace placeholder values:
-
-- `name`: Your app name
-- `slug`: Your app slug (lowercase, hyphens)
-- `scheme`: Your deep link scheme (lowercase, no special chars)
-- `ios.bundleIdentifier`: Your iOS bundle ID (e.g., `com.yourcompany.yourapp`)
-- `android.package`: Your Android package name
-- `extra.eas.projectId`: Your EAS project ID (run `eas init` to create one)
-- `owner`: Your Expo username
-- `updates.url`: Update with your EAS project ID
-
-### 4. Set Up Supabase
-
-This template requires a Supabase backend with specific database tables and migrations. The Supabase configuration is maintained in a **separate repository**.
-
-1. Clone the companion Supabase repository:
-   ```bash
-   git clone <YOUR_SUPABASE_REPO_URL> supabase-backend
-   cd supabase-backend
-   ```
-
-2. Start local Supabase:
-   ```bash
-   supabase start
-   ```
-
-3. Run the migrations:
-   ```bash
-   supabase db reset
-   ```
-
-4. Get your local credentials:
-   ```bash
-   supabase status
-   ```
-   Copy the `API URL` and `anon key` to your `.env` file.
-
-See the Supabase repository README for more details on the database schema and migrations.
-
-### 5. Start Development
-
-```bash
-npx expo start
-```
-
-## Environment Configuration
-
-### Local Development (.env)
-
-For local development, use a `.env` file:
-
-```env
-EXPO_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-EXPO_PUBLIC_SUPABASE_PUB_KEY=your-anon-key
-APP_ENV=development
-```
-
-### EAS Builds (eas.json)
-
-For EAS builds, configure environment variables in `eas.json`:
-
-```json
-{
-  "build": {
-    "development": {
-      "env": {
-        "APP_ENV": "development",
-        "EXPO_PUBLIC_SUPABASE_URL": "your-dev-url",
-        "EXPO_PUBLIC_SUPABASE_PUB_KEY": "your-dev-key"
-      }
-    },
-    "production": {
-      "env": {
-        "APP_ENV": "production",
-        "EXPO_PUBLIC_SUPABASE_URL": "your-prod-url",
-        "EXPO_PUBLIC_SUPABASE_PUB_KEY": "your-prod-key"
-      }
-    }
-  }
-}
-```
-
-### EAS Secrets (Recommended for Production)
-
-For sensitive values, use EAS secrets:
-
-```bash
-eas secret:create --name EXPO_PUBLIC_SUPABASE_URL --value "your-url"
-eas secret:create --name EXPO_PUBLIC_SUPABASE_PUB_KEY --value "your-key"
-```
-
-Then reference in `eas.json`:
-
-```json
-{
-  "build": {
-    "production": {
-      "env": {
-        "EXPO_PUBLIC_SUPABASE_URL": "@EXPO_PUBLIC_SUPABASE_URL",
-        "EXPO_PUBLIC_SUPABASE_PUB_KEY": "@EXPO_PUBLIC_SUPABASE_PUB_KEY"
-      }
-    }
-  }
-}
-```
-
-## Push Notifications
-
-### Android Setup
-
-1. Create a Firebase project at https://console.firebase.google.com
-2. Add an Android app with your package name
-3. Download `google-services.json` and place it in the project root
-4. The file is already referenced in `app.json`
-
-### iOS Setup
-
-1. Configure push credentials in EAS:
-   ```bash
-   eas credentials
-   ```
-2. Select iOS, then push notifications
-3. EAS will guide you through creating/uploading push credentials
-
-### Token Storage
-
-Push tokens are automatically stored in the `users.fcm_tokens` column when users sign in.
-
-## Commands
-
-### Development
-
-```bash
-npx expo start          # Start dev server
-npx expo start --clear  # Clear cache and start
-```
-
-### EAS Build & Deploy
-
-Requires EAS CLI installed globally (`npm install -g eas-cli`).
-
-```bash
-# Development builds (internal testing)
-eas build --profile development --platform ios
-eas build --profile development --platform android
-
-# Production builds
-eas build --profile production --platform ios
-eas build --profile production --platform android
-
-# Build and submit to stores
-eas build --profile production --platform ios --auto-submit
-eas build --profile production --platform android --auto-submit
-
-# Over-the-air updates
-eas update --branch production --message "Description of update"
-```
-
-### Build Profiles
-
-| Profile | Purpose |
-|---------|---------|
-| `development` | Dev client builds for internal distribution |
-| `production` | Store builds with auto-increment versioning |
-
-## Project Structure
-
-```
-├── app/                    # Expo Router file-based routing
-│   ├── (auth)/             # Auth screens (email-auth, onboarding)
-│   ├── (tabs)/             # Tab navigation (home, profile, edit-profile)
-│   └── _layout.tsx         # Root layout with providers
-├── src/
-│   ├── components/         # Reusable components
-│   │   ├── ui/             # UI primitives (Button, Input, Text, Avatar)
-│   │   ├── forms/          # Form components with react-hook-form
-│   │   └── error/          # Error boundaries
-│   ├── features/           # Feature modules
-│   │   ├── auth/           # Authentication (stores)
-│   │   └── profile/        # User profile (hooks)
-│   ├── hooks/              # Global hooks (useColors, useIsDark)
-│   ├── lib/                # Utilities (api, supabase, theme, queryClient, notifications)
-│   ├── stores/             # Global Zustand stores (theme, notifications)
-│   └── types/              # TypeScript types
-├── assets/                 # Static assets
-├── app.json                # Expo configuration
-└── eas.json                # EAS Build configuration
-```
-
-## Adding New Features
-
-### Creating a New CRUD Feature
-
-1. Add types to `src/types/database.ts`
-2. Create feature folder: `src/features/yourfeature/`
-3. Create hooks: `src/features/yourfeature/hooks/useYourFeature.ts`
-4. Export from feature index: `src/features/yourfeature/index.ts`
-
-Example hook structure (see `src/features/items/hooks/useItems.ts`):
-
-```typescript
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { supabase } from '@/src/lib/supabase'
-
-export const yourFeatureKeys = {
-  all: ['yourfeature'] as const,
-  list: (userId: string) => [...yourFeatureKeys.all, 'list', userId] as const,
-  detail: (id: string) => [...yourFeatureKeys.all, 'detail', id] as const,
-}
-
-export function useYourFeatures(userId: string | undefined) {
-  return useQuery({
-    queryKey: yourFeatureKeys.list(userId ?? ''),
-    queryFn: async () => {
-      // Your query logic
-    },
-    enabled: !!userId,
-  })
-}
-```
-
-## CI/CD with Codemagic
-
-### Setup
-
-1. Connect your repository to Codemagic
-2. Add App Store Connect API key to Codemagic integrations
-3. Update `codemagic.yaml` with your values:
-   - `bundle_identifier`: Your iOS bundle ID
-   - `XCODE_WORKSPACE`: Your workspace name (matches app name)
-   - `XCODE_SCHEME`: Your scheme name (matches app name)
-   - `APP_ID`: Your App Store Connect app ID
-   - Environment variables for Supabase
+Privacy policy and terms of use can be found at https://covve.com/scanner/privacy
 
 ### Building
 
