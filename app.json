@@ -67,6 +67,13 @@
     },
     "runtimeVersion": {
       "policy": "appVersion"
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "479da72b-ac7c-4dcd-9d8c-38754019d03d"
+      }
+    },
+    "owner": "yashnilshukla"
   }
 }
